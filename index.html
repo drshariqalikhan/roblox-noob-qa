@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Roblox Noob Q&amp;A Arena</title>
+  <meta name="theme-color" content="#121217">
+  <meta name="description" content="A Roblox Noob Q&A Coin Stealing Duel Game based on handwritten rules.">
+  
+  <!-- Inline Web App Manifest Data URI for PWA support -->
+  <link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjoiUm9ibG94IE5vb2IgUVRBIEFyZW5hIiwic2hvcnRfbmFtZSI6Ik5vb2JRUkEiLCJzdGFydF91cmwiOiIuLyIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwiYmFja2dyb3VuZF9jb2xvciI6IiMxMjEyMTciLCJ0aGVtZV9jb2xvciI6IiMxMjEyMTciLCJpY29ucyI6W3sic3JjIjoiZGF0YTppbWFnZS9zdmcreG1sOzUxMix7dGV4dD0nT29mJ30iLCJzaXplcyI6IjUxMng1MTIiLCJ0eXBlIjoiaW1hZ2Uvc3ZnK3htbCJ9XX0=">
+
+  <style>
+    :root {
+      --bg-dark: #101216;
+      --card-bg: #1a1d24;
+      --card-border: #2c323f;
+      --accent: #ffcc00;
+      --accent-hover: #e6b800;
+      --danger: #ff4757;
+      --success: #2ed573;
+      --text-main: #f1f2f6;
+      --text-muted: #a4b0be;
+      --roblox-blue: #0055bf;
+      --roblox-yellow: #ffe800;
+      --roblox-green: #00a651;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Dark Header / Nav */
+    header {
+      background: rgba(18, 20, 26, 0.95);
+      border-bottom: 2px solid var(--card-border);
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--roblox-yellow);
+      border: 2px solid #000;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      color: #000;
+      box-shadow: 2px 2px 0px #000;
+    }
+
+    .brand h1 {
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    .stats-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #242933;
+      padding: 6px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--card-border);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .coin-badge {
+      color: var(--accent);
+      border-color: rgba(255, 204, 0, 0.3);
+    }
+
+    .btn {
+      background: #2b313e;
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      background: #384050;
+      border-color: #4b5568;
+    }
+
+    .btn-accent {
+      background: var(--accent);
+      color: #000;
+      border-color: #caa000;
+    }
+    .btn-accent:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: #fff;
+      border: none;
+    }
+
+    /* Game World Viewport */
+    #game-container {
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+      background: #000;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Bottom Control Bar / Table Selector */
+    #lobby-controls {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20, 24, 33, 0.88);
+      backdrop-filter: blur(8px);
+      padding: 10px 18px;
+      border-radius: 30px;
+      border: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      z-index: 5;
+    }
+
+    /* Floating Question / Duel Modal */
+    .game-modal {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--card-bg);
+      border: 2px solid var(--card-border);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 440px;
+      padding: 20px;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.7);
+      z-index: 20;
+    }
+
+    .game-modal h2 {
+      font-size: 1.25rem;
+      margin-bottom: 8px;
+      color: var(--accent);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 15px;
+    }
+
+    .input-group {
+      margin-bottom: 14px;
+    }
+
+    .input-group label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      background: #111317;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
+    .timer-bar {
+      height: 4px;
+      background: #333;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .timer-progress {
+      height: 100%;
+      background: var(--accent);
+      width: 100%;
+      transition: width 1s linear;
+    }
+
+    /* Rules & Shop Full Modals */
+    .overlay-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      z-index: 30;
+      justify-content: center;
+      align-items: center;
+      padding: 15px;
+    }
+
+    .modal-content {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 580px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .rule-section {
+      background: #12141a;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 14px;
+      border-left: 4px solid var(--accent);
+    }
+
+    .rule-section h3 {
+      font-size: 1rem;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    .rule-section ol {
+      padding-left: 20px;
+      color: #cbd5e1;
+    }
+
+    .rule-section li {
+      margin-bottom: 6px;
+    }
+
+    .shop-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 12px;
+    }
+
+    .shop-item {
+      background: #12141a;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .shop-item-preview {
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+    }
+
+    /* Notification Banner */
+    #toast {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      background: #242933;
+      border: 1px solid var(--accent);
+      color: #fff;
+      padding: 10px 22px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.6);
+      transition: transform 0.3s ease;
+      z-index: 50;
+      pointer-events: none;
+    }
+    #toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Dark Header HUD -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">OOF</div>
+      <div>
+        <h1>Noob Q&amp;A Arena</h1>
+        <small style="color:var(--text-muted); font-size: 0.72rem;">Server Capacity: 6 / 13 Players</small>
+      </div>
+    </div>
+    
+    <div class="stats-bar">
+      <div class="badge coin-badge">
+        <span>💰</span>
+        <span id="player-coins">0</span> Coins
+      </div>
+      <button class="btn" onclick="openShop()">🛒 Shop</button>
+      <button class="btn" onclick="openRules()">📜 Rules</button>
+      <button class="btn btn-danger" onclick="openReportModal()">🚨 Report</button>
+    </div>
+  </header>
+
+  <!-- 2D Canvas Grassy Field & Sky -->
+  <div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Bottom Lobby Controls -->
+    <div id="lobby-controls">
+      <span id="match-status-text">Select an empty chair at a table to sit</span>
+      <button id="btn-stand-up" class="btn btn-danger" style="display:none;" onclick="standUp()">Leave Table</button>
+    </div>
+
+    <!-- Ask Question Modal -->
+    <div id="modal-ask" class="game-modal">
+      <h2>Your Turn: Ask! <span>❓</span></h2>
+      <div class="modal-subtitle">Opponent steals 30 coins if right; you steal 30 if wrong!</div>
+      <div class="input-group">
+        <label>Type Your Question</label>
+        <input type="text" id="ask-question-input" placeholder="e.g. What is 5 + 7?" autocomplete="off" maxlength="80">
+      </div>
+      <div class="input-group">
+        <label>Secret Answer (Exact Match)</label>
+        <input type="text" id="ask-answer-input" placeholder="e.g. 12" autocomplete="off" maxlength="40">
+      </div>
+      <button class="btn btn-accent" style="width:100%; justify-content:center;" onclick="submitPlayerQuestion()">Send Question to Opponent</button>
+    </div>
+
+    <!-- Answer Question Modal -->
+    <div id="modal-answer" class="game-modal">
+      <div class="timer-bar"><div id="answer-timer" class="timer-progress"></div></div>
+      <h2>Answer the Duel! <span>⏳</span></h2>
+      <div class="modal-subtitle" id="opponent-question-text">Waiting for question...</div>
+      <div class="input-group">
+        <label>Your Answer</label>
+        <input type="text" id="player-answer-input" placeholder="Enter answer..." autocomplete="off">
+      </div>
+      <button class="btn btn-accent" style="width:100%; justify-content:center;" onclick="submitPlayerAnswer()">Submit Answer</button>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast">Welcome to Roblox Noob Q&amp;A!</div>
+
+  <!-- Rules Modal (Transcribed directly from handwritten sheet) -->
+  <div id="rules-modal" class="overlay-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 style="color:var(--accent);">📜 Official Handwritten Rules</h2>
+        <button class="btn" onclick="closeRules()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="rule-section">
+          <h3>Normal Rules</h3>
+          <ol>
+            <li><strong>6 people max in 1 game.</strong> (3 tables with 2 chairs each).</li>
+            <li><strong>The max coins you can take is 30.</strong> (Or all remaining coins if they have under 30).</li>
+            <li><strong>NO BOTS!</strong> Any bot that joins will be banned from our game (our Roblox game).</li>
+            <li><strong>No: Glitching, exploiting, hacking or cheating.</strong> Anyone who doesn't follow will get banned from our game.</li>
+            <li><strong>The max people in the server is 13.</strong></li>
+          </ol>
+        </div>
+
+        <div class="rule-section" style="border-left-color: var(--roblox-green);">
+          <h3>Gameplay Rules</h3>
+          <ol>
+            <li><strong>People can steal your coins. Watch out!</strong></li>
+            <li><strong>There will be one computer for players who just joined to play against.</strong> (Noob is guaranteed to win against computer to earn 100 bonus coins!)</li>
+            <li><strong>The game can be glitchy.</strong> If so, please be patient with it.</li>
+            <li><strong>Have Fun!</strong></li>
+            <li><strong>If people break the rules, report immediately.</strong> (Those who report and successfully get the rule violator out get <strong>+10 coins</strong> reward!).</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shop Modal -->
+  <div id="shop-modal" class="overlay-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 style="color:var(--accent);">🛒 Inventory Shop</h2>
+        <button class="btn" onclick="closeShop()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-muted); margin-bottom:15px;">Spend stolen coins on custom chairs, tables, and Noob accessories!</p>
+        
+        <h3 style="margin-bottom:8px; font-size:0.95rem;">🪑 Custom Chairs</h3>
+        <div class="shop-grid" id="chair-shop-grid"></div>
+
+        <h3 style="margin:16px 0 8px; font-size:0.95rem;">🪵 Tables</h3>
+        <div class="shop-grid" id="table-shop-grid"></div>
+
+        <h3 style="margin:16px 0 8px; font-size:0.95rem;">👑 Noob Hats &amp; Accessories</h3>
+        <div class="shop-grid" id="hat-shop-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Report Modal (Rule 5: +10 coin bounty) -->
+  <div id="report-modal" class="overlay-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 style="color:var(--danger);">🚨 Report Exploiter or Bot</h2>
+        <button class="btn" onclick="closeReportModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-muted); margin-bottom: 12px;">
+          Handwritten Rule 5: Report rule violators, bots, or exploiters. If confirmed banned, you are awarded <strong>+10 coins</strong> bounty!
+        </p>
+        <div class="input-group">
+          <label>Violator Username / Bot ID</label>
+          <input type="text" id="report-user-input" placeholder="e.g. GlitchMaster99 or Bot_AutoCoin">
+        </div>
+        <div class="input-group">
+          <label>Infraction</label>
+          <select id="report-reason" style="width:100%; padding:10px; background:#111317; border:1px solid var(--card-border); color:#fff; border-radius:6px;">
+            <option>Exploiting / Hacking (Rule 4)</option>
+            <option>Automated Bot (Rule 3)</option>
+            <option>Coin Duplication Glitch</option>
+          </select>
+        </div>
+        <button class="btn btn-danger" style="width:100%; justify-content:center; margin-top:10px;" onclick="confirmReport()">Submit Report &amp; Claim Bounty</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================================
+       1. SOUND EFFECTS SYNTHESIZER (Web Audio API - Zero Asset Dependency)
+       ========================================================== */
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playBeep(type = 'blip') {
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        const now = audioCtx.currentTime;
+
+        if (type === 'blip') {
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+          osc.start(now);
+          osc.stop(now + 0.1);
+        } else if (type === 'win') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(330, now);
+          osc.frequency.setValueAtTime(440, now + 0.1);
+          osc.frequency.setValueAtTime(554, now + 0.2);
+          osc.frequency.setValueAtTime(659, now + 0.3);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.5);
+          osc.start(now);
+          osc.stop(now + 0.5);
+        } else if (type === 'oof') {
+          // Classic roblox-inspired low punch sound
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(160, now);
+          osc.frequency.exponentialRampToValueAtTime(60, now + 0.2);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+          osc.start(now);
+          osc.stop(now + 0.2);
+        } else if (type === 'coin') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(987.77, now);
+          osc.frequency.setValueAtTime(1318.51, now + 0.08);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        }
+      } catch (e) { /* ignore audio error */ }
+    }
+
+    /* ==========================================================
+       2. GAME STATE & LOCALSTORAGE
+       ========================================================== */
+    const STORAGE_KEY_COINS = 'roblox_noob_coins';
+    const STORAGE_KEY_TUTORIAL = 'roblox_noob_first_win_done';
+    const STORAGE_KEY_ITEMS = 'roblox_noob_owned_items';
+    const STORAGE_KEY_EQUIPPED = 'roblox_noob_equipped';
+
+    let coins = parseInt(localStorage.getItem(STORAGE_KEY_COINS) || '0', 10);
+    let tutorialCompleted = localStorage.getItem(STORAGE_KEY_TUTORIAL) === 'true';
+    let ownedItems = JSON.parse(localStorage.getItem(STORAGE_KEY_ITEMS) || '["chair_wood", "table_wood", "hat_none"]');
+    let equipped = JSON.parse(localStorage.getItem(STORAGE_KEY_EQUIPPED) || '{"chair":"chair_wood","table":"table_wood","hat":"hat_none"}');
+
+    // Player Identification
+    const myPlayerId = 'player_' + Math.random().toString(36).substring(2, 9);
+    const myPlayerName = "Noob_" + myPlayerId.substring(7);
+
+    // Multi-tab synchronization using BroadcastChannel
+    const channel = new BroadcastChannel('roblox_noob_trivia_channel');
+
+    /* ==========================================================
+       3. TABLES SETUP (Handwritten Rule 1: 6 people max in 1 game)
+       ========================================================== */
+    // 3 tables * 2 chairs = 6 maximum seats
+    const tables = [
+      { id: 1, x: 0.22, y: 0.65, seats: [null, null], style: 'wood' },
+      { id: 2, x: 0.50, y: 0.65, seats: [null, null], style: 'wood' },
+      { id: 3, x: 0.78, y: 0.65, seats: [null, null], style: 'wood' }
+    ];
+
+    let currentSeatedTable = null; // table object
+    let currentSeatIndex = null;   // 0 or 1
+    let opponent = null;           // { id, name, isBot, coins, hat }
+    let waitTimer = null;
+    let waitSecondsRemaining = 60;
+    let activeQuestion = null;     // { q, a, askerId }
+
+    /* ==========================================================
+       4. SHOP DATA DEFINITIONS
+       ========================================================== */
+    const SHOP_CATALOG = {
+      chairs: [
+        { id: 'chair_wood', name: 'Wooden Stool', price: 0, color: '#8B5A2B', icon: '🪵' },
+        { id: 'chair_gamer', name: 'Gaming Chair', price: 50, color: '#ff0055', icon: '💺' },
+        { id: 'chair_gold', name: 'Gold Throne', price: 150, color: '#FFD700', icon: '👑' },
+      ],
+      tables: [
+        { id: 'table_wood', name: 'Picnic Wood', price: 0, color: '#A0522D', icon: '🪵' },
+        { id: 'table_cyber', name: 'Cyber Neon', price: 60, color: '#00f3ff', icon: '🛸' },
+        { id: 'table_obsidian', name: 'Obsidian Slab', price: 140, color: '#1f1f2e', icon: '⬛' },
+      ],
+      hats: [
+        { id: 'hat_none', name: 'Bald Classic', price: 0, icon: '🙂' },
+        { id: 'hat_cap', name: 'Roblox Visor', price: 30, icon: '🧢' },
+        { id: 'hat_tophat', name: 'Gentleman Hat', price: 80, icon: '🎩' },
+        { id: 'hat_crown', name: 'Blox Crown', price: 180, icon: '👑' },
+      ]
+    };
+
+    /* ==========================================================
+       5. GRAPHICS & CANVAS RENDER ENGINE (Roblox Noob Aesthetics)
+       ========================================================== */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    let clouds = [
+      { x: 50, y: 60, s: 45 },
+      { x: 300, y: 90, s: 60 },
+      { x: 650, y: 40, s: 50 },
+      { x: 950, y: 80, s: 70 }
+    ];
+
+    function resizeCanvas() {
+      const container = document.getElementById('game-container');
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function renderLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const w = canvas.width;
+      const h = canvas.height;
+
+      // 1. Blue Sky with horizon gradient
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, h * 0.45);
+      skyGrad.addColorStop(0, '#1da1f2');
+      skyGrad.addColorStop(1, '#8ed1fc');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, w, h * 0.45);
+
+      // Clouds (Blocky Roblox style)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+      clouds.forEach(c => {
+        c.x += 0.25;
+        if (c.x > w + 80) c.x = -100;
+        ctx.fillRect(c.x, c.y, c.s * 1.8, c.s * 0.7);
+        ctx.fillRect(c.x + 15, c.y - 12, c.s * 1.2, c.s * 0.7);
+      });
+
+      // 2. Grassy Field (with classic Roblox green & stud grid effect)
+      const grassY = h * 0.45;
+      const grassGrad = ctx.createLinearGradient(0, grassY, 0, h);
+      grassGrad.addColorStop(0, '#43a047');
+      grassGrad.addColorStop(1, '#2e7d32');
+      ctx.fillStyle = grassGrad;
+      ctx.fillRect(0, grassY, w, h - grassY);
+
+      // Stud Grid lines
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.07)';
+      ctx.lineWidth = 2;
+      const gridSpacing = 40;
+      for (let y = grassY; y < h; y += gridSpacing) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+      for (let x = 0; x < w; x += gridSpacing) {
+        ctx.beginPath();
+        ctx.moveTo(x, grassY);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+
+      // 3. Render Tables, Chairs & Seated Roblox Noobs
+      tables.forEach((tbl) => {
+        const tx = tbl.x * w;
+        const ty = tbl.y * h;
+
+        // Table visual color
+        const tableColor = tbl.id === currentSeatedTable?.id && equipped.table 
+          ? SHOP_CATALOG.tables.find(t=>t.id === equipped.table)?.color || '#A0522D'
+          : '#8B4513';
+
+        // Table Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath();
+        ctx.ellipse(tx, ty + 20, 65, 25, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Left Chair & Right Chair
+        const chairOffsets = [-50, 50];
+        for (let i = 0; i < 2; i++) {
+          const cx = tx + chairOffsets[i];
+          const cy = ty - 8;
+          const chairUser = tbl.seats[i];
+          const chairColor = (chairUser && chairUser.id === myPlayerId)
+            ? SHOP_CATALOG.chairs.find(c=>c.id === equipped.chair)?.color || '#5c3a21'
+            : '#5c3a21';
+
+          // Chair drawing
+          ctx.fillStyle = chairColor;
+          ctx.fillRect(cx - 15, cy, 30, 24);
+          ctx.fillRect(cx - 15, cy - 20, 30, 20); // Backrest
+
+          // Draw Seated Roblox Noob Avatar if occupied
+          if (chairUser) {
+            drawRobloxNoob(cx, cy - 25, chairUser);
+          } else {
+            // Draw empty chair indicator
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('CLICK TO SIT', cx, cy - 25);
+          }
+        }
+
+        // Table Surface
+        ctx.fillStyle = tableColor;
+        ctx.fillRect(tx - 38, ty - 15, 76, 30);
+        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        ctx.fillRect(tx - 38, ty + 10, 76, 5); // Table edge
+        // Table Legs
+        ctx.fillStyle = '#3a200a';
+        ctx.fillRect(tx - 32, ty + 15, 8, 20);
+        ctx.fillRect(tx + 24, ty + 15, 8, 20);
+
+        // Table Label
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Table ${tbl.id} (2/2 Max)`, tx, ty + 46);
+      });
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    /**
+     * Draw authentic Roblox "Noob" character:
+     * - Head: #FFE800 (Yellow) with smiley :)
+     * - Torso: #002AEC (Blue)
+     * - Arms: #FFE800 (Yellow)
+     * - Legs: #00A651 (Green)
+     */
+    function drawRobloxNoob(x, y, playerObj) {
+      ctx.save();
+      ctx.translate(x, y);
+
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.beginPath();
+      ctx.ellipse(0, 30, 20, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Legs (Roblox Green)
+      ctx.fillStyle = 'var(--roblox-green)';
+      ctx.fillStyle = '#00a651';
+      ctx.fillRect(-12, 10, 11, 20);
+      ctx.fillRect(1, 10, 11, 20);
+
+      // Torso (Roblox Blue)
+      ctx.fillStyle = '#0055bf';
+      ctx.fillRect(-14, -10, 28, 22);
+
+      // Arms (Roblox Yellow)
+      ctx.fillStyle = '#ffe800';
+      ctx.fillRect(-22, -10, 8, 20);
+      ctx.fillRect(14, -10, 8, 20);
+
+      // Head (Roblox Yellow)
+      ctx.fillRect(-10, -28, 20, 18);
+
+      // Classic Roblox Face :)
+      ctx.fillStyle = '#000000';
+      // Eyes
+      ctx.fillRect(-6, -23, 3, 4);
+      ctx.fillRect(3, -23, 3, 4);
+      // Smile curve
+      ctx.beginPath();
+      ctx.arc(0, -18, 5, 0.15 * Math.PI, 0.85 * Math.PI, false);
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Hat accessory if equipped
+      const hatId = playerObj.hat || 'hat_none';
+      if (hatId === 'hat_cap') {
+        ctx.fillStyle = '#ff0033';
+        ctx.fillRect(-12, -32, 24, 6);
+        ctx.fillRect(-12, -28, 30, 3); // Brim
+      } else if (hatId === 'hat_tophat') {
+        ctx.fillStyle = '#222';
+        ctx.fillRect(-15, -30, 30, 4);
+        ctx.fillRect(-10, -45, 20, 16);
+        ctx.fillStyle = '#ff0000';
+        ctx.fillRect(-10, -33, 20, 3);
+      } else if (hatId === 'hat_crown') {
+        ctx.fillStyle = '#ffd700';
+        ctx.beginPath();
+        ctx.moveTo(-11, -28);
+        ctx.lineTo(-11, -38);
+        ctx.lineTo(-5, -32);
+        ctx.lineTo(0, -40);
+        ctx.lineTo(5, -32);
+        ctx.lineTo(11, -38);
+        ctx.lineTo(11, -28);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Name & Coin Tag floating above
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+      ctx.fillRect(-45, -54, 90, 20);
+      ctx.strokeStyle = '#ffe800';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(-45, -54, 90, 20);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(playerObj.name, 0, -43);
+      ctx.fillStyle = '#ffcc00';
+      ctx.font = '9px sans-serif';
+      ctx.fillText(`💰 ${playerObj.coins} coins`, 0, -36);
+
+      ctx.restore();
+    }
+
+    /* ==========================================================
+       6. CHAIR INTERACTION & MATCHMAKING
+       ========================================================== */
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      const w = canvas.width;
+      const h = canvas.height;
+
+      tables.forEach((tbl) => {
+        const tx = tbl.x * w;
+        const ty = tbl.y * h;
+        const chairOffsets = [-50, 50];
+
+        for (let i = 0; i < 2; i++) {
+          const cx = tx + chairOffsets[i];
+          const cy = ty - 8;
+          const dist = Math.hypot(clickX - cx, clickY - cy);
+
+          if (dist < 35) {
+            // Clicked this chair
+            sitAtTable(tbl, i);
+          }
+        }
+      });
+    });
+
+    function updateHud() {
+      document.getElementById('player-coins').innerText = coins;
+      localStorage.setItem(STORAGE_KEY_COINS, coins);
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3500);
+    }
+
+    function sitAtTable(tbl, seatIdx) {
+      if (currentSeatedTable) {
+        showToast("You are already seated! Stand up first.");
+        return;
+      }
+      if (tbl.seats[seatIdx] !== null) {
+        showToast("That chair is occupied!");
+        return;
+      }
+
+      currentSeatedTable = tbl;
+      currentSeatIndex = seatIdx;
+      tbl.seats[seatIdx] = {
+        id: myPlayerId,
+        name: myPlayerName,
+        coins: coins,
+        hat: equipped.hat
+      };
+
+      document.getElementById('btn-stand-up').style.display = 'inline-block';
+      playBeep('blip');
+
+      // Check Rule 2: Gameplay Rules
+      // "There will be one computer for players who just joined to play against.
+      // (noob is guaranteed to win against computer)"
+      if (!tutorialCompleted) {
+        startFirstGameGuaranteedWin(tbl, seatIdx === 0 ? 1 : 0);
+        return;
+      }
+
+      // Broadcast chair sit event to other tabs
+      broadcastState();
+
+      // Check if another human player is already in the opposite chair
+      const otherSeatIdx = seatIdx === 0 ? 1 : 0;
+      if (tbl.seats[otherSeatIdx] !== null) {
+        // Opponent is already here!
+        startMatch(tbl.seats[otherSeatIdx]);
+      } else {
+        // Wait up to 60 seconds for a human player, then summon Computer
+        startWaitTimer(tbl, otherSeatIdx);
+      }
+    }
+
+    function standUp() {
+      if (!currentSeatedTable) return;
+      currentSeatedTable.seats[currentSeatIndex] = null;
+      currentSeatedTable = null;
+      currentSeatIndex = null;
+      opponent = null;
+      clearInterval(waitTimer);
+      document.getElementById('btn-stand-up').style.display = 'none';
+      document.getElementById('match-status-text').innerText = "Select an empty chair at a table to sit";
+      closeModal('modal-ask');
+      closeModal('modal-answer');
+      broadcastState();
+      playBeep('blip');
+    }
+
+    function startWaitTimer(tbl, botSeatIdx) {
+      waitSecondsRemaining = 60;
+      document.getElementById('match-status-text').innerText = 
+        `Waiting for real human to join table... (${waitSecondsRemaining}s)`;
+
+      clearInterval(waitTimer);
+      waitTimer = setInterval(() => {
+        waitSecondsRemaining--;
+        if (waitSecondsRemaining > 0) {
+          document.getElementById('match-status-text').innerText = 
+            `Waiting for real human to join table... (${waitSecondsRemaining}s)`;
+        } else {
+          clearInterval(waitTimer);
+          // 60 seconds passed! Summon Computer Player (as requested)
+          const bot = {
+            id: 'bot_computer',
+            name: 'Roblox_AI_Guest',
+            isBot: true,
+            coins: 60,
+            hat: 'hat_cap'
+          };
+          tbl.seats[botSeatIdx] = bot;
+          showToast("No human joined in 60s. Computer joined to duel!");
+          startMatch(bot);
+        }
+      }, 1000);
+    }
+
+    /* ==========================================================
+       7. FIRST JOIN TUTORIAL (Handwritten Rule 2: Guaranteed 100 Coin Win)
+       ========================================================== */
+    function startFirstGameGuaranteedWin(tbl, otherSeat) {
+      const easyBot = {
+        id: 'bot_easy_tutorial',
+        name: 'Computer (Easy)',
+        isBot: true,
+        coins: 50,
+        hat: 'hat_none'
+      };
+      tbl.seats[otherSeat] = easyBot;
+      opponent = easyBot;
+
+      document.getElementById('match-status-text').innerText = "First game vs Computer (Guaranteed Win)!";
+      showToast("Welcome! Win your first game to earn 100 coins!");
+
+      setTimeout(() => {
+        // Prompt player to ask a question
+        openAskModal();
+      }, 800);
+    }
+
+    function finishFirstWinAward() {
+      tutorialCompleted = true;
+      localStorage.setItem(STORAGE_KEY_TUTORIAL, 'true');
+      coins += 100;
+      updateHud();
+      playBeep('win');
+      showToast("🎉 FIRST WIN BONUS: +100 Coins Awarded!");
+      if (currentSeatedTable) currentSeatedTable.seats[currentSeatIndex === 0 ? 1 : 0] = null;
+      opponent = null;
+      standUp();
+    }
+
+    /* ==========================================================
+       8. MATCH LOGIC & RULES COIN STEALING (Max 30 Coins Rule 2)
+       ========================================================== */
+    function startMatch(opp) {
+      clearInterval(waitTimer);
+      opponent = opp;
+      document.getElementById('match-status-text').innerText = `Dueling against ${opp.name}!`;
+      showToast(`Duel started vs ${opp.name}!`);
+
+      // Player 1 begins by asking a question
+      setTimeout(() => {
+        openAskModal();
+      }, 600);
+    }
+
+    function openAskModal() {
+      document.getElementById('ask-question-input').value = '';
+      document.getElementById('ask-answer-input').value = '';
+      document.getElementById('modal-ask').style.display = 'block';
+    }
+
+    function submitPlayerQuestion() {
+      const q = document.getElementById('ask-question-input').value.trim();
+      const a = document.getElementById('ask-answer-input').value.trim();
+
+      if (!q || !a) {
+        showToast("Please provide both a question and answer!");
+        return;
+      }
+
+      closeModal('modal-ask');
+      playBeep('blip');
+
+      if (opponent.isBot) {
+        // If first game: Computer ALWAYS fails (guaranteed win rule)
+        if (!tutorialCompleted) {
+          setTimeout(() => {
+            handleAnswerResult(false, "Computer guessed wrong: 'I have no idea!'");
+            finishFirstWinAward();
+          }, 1200);
+        } else {
+          // Standard AI duel: 50/50 chance
+          const botWins = Math.random() < 0.35;
+          setTimeout(() => {
+            if (botWins) {
+              handleAnswerResult(true, `Computer guessed correctly: '${a}'!`);
+            } else {
+              handleAnswerResult(false, `Computer guessed wrong!`);
+            }
+          }, 1500);
+        }
+      } else {
+        // Send to real human via BroadcastChannel
+        channel.postMessage({
+          type: 'QUESTION_ASKED',
+          from: myPlayerId,
+          targetTable: currentSeatedTable.id,
+          question: q,
+          answer: a
+        });
+        showToast("Question sent to opposing player!");
+      }
+    }
+
+    function promptAnswerModal(questionText, correctAnswer) {
+      activeQuestion = { q: questionText, a: correctAnswer };
+      document.getElementById('opponent-question-text').innerText = `"${questionText}"`;
+      document.getElementById('player-answer-input').value = '';
+      document.getElementById('modal-answer').style.display = 'block';
+
+      // 30s timer for answering
+      const bar = document.getElementById('answer-timer');
+      bar.style.width = '100%';
+      let timeLeft = 30;
+      clearInterval(window.ansTimerInterval);
+      window.ansTimerInterval = setInterval(() => {
+        timeLeft--;
+        bar.style.width = `${(timeLeft / 30) * 100}%`;
+        if (timeLeft <= 0) {
+          clearInterval(window.ansTimerInterval);
+          submitPlayerAnswer(true); // timed out = wrong
+        }
+      }, 1000);
+    }
+
+    function submitPlayerAnswer(timedOut = false) {
+      clearInterval(window.ansTimerInterval);
+      closeModal('modal-answer');
+
+      const userAns = document.getElementById('player-answer-input').value.trim().toLowerCase();
+      const isCorrect = !timedOut && (userAns === activeQuestion.a.trim().toLowerCase());
+
+      if (opponent && opponent.isBot) {
+        // Against bot
+        handleAnswerResult(isCorrect, isCorrect ? "You got it right!" : "Wrong answer!");
+      } else {
+        channel.postMessage({
+          type: 'ANSWER_SUBMITTED',
+          from: myPlayerId,
+          isCorrect: isCorrect
+        });
+      }
+    }
+
+    /**
+     * Coin Steal calculation based on Handwritten Rule 2:
+     * - The max coins you can take is 30.
+     * - If opposing player answers correctly, opponent gets 30 coins from player.
+     *   (If player has < 30 coins, opponent takes ALL coins, player loses).
+     * - If wrong, question asker takes 30 coins from opponent (or all if < 30).
+     */
+    function handleAnswerResult(opponentGotCorrect, message) {
+      const STOLEN_AMOUNT = 30;
+
+      if (opponentGotCorrect) {
+        // Opponent takes 30 coins from player
+        const take = Math.min(coins, STOLEN_AMOUNT);
+        coins -= take;
+        playBeep('oof');
+        showToast(`💥 ${message} Opponent stole ${take} coins from you!`);
+
+        if (coins <= 0) {
+          coins = 0;
+          showToast("💔 You lost all your coins!");
+          standUp();
+        }
+      } else {
+        // Player steals 30 coins from opponent
+        const oppCoins = opponent ? opponent.coins : 30;
+        const take = Math.min(oppCoins, STOLEN_AMOUNT);
+        coins += take;
+        if (opponent) opponent.coins -= take;
+        playBeep('coin');
+        showToast(`🎉 ${message} You stole ${take} coins from your opponent!`);
+
+        if (opponent && opponent.coins <= 0) {
+          showToast(`🏆 Opponent lost all their coins! You won the duel!`);
+          standUp();
+        }
+      }
+      updateHud();
+    }
+
+    /* ==========================================================
+       9. MULTI-TAB MULTIPLAYER SYNC (BroadcastChannel)
+       ========================================================== */
+    function broadcastState() {
+      channel.postMessage({
+        type: 'TABLE_SYNC',
+        senderId: myPlayerId,
+        tablesState: tables.map(t => ({
+          id: t.id,
+          seats: t.seats.map(s => s ? { id: s.id, name: s.name, coins: s.coins, hat: s.hat, isBot: !!s.isBot } : null)
+        }))
+      });
+    }
+
+    channel.onmessage = (event) => {
+      const data = event.data;
+      if (!data) return;
+
+      if (data.type === 'TABLE_SYNC' && data.senderId !== myPlayerId) {
+        // Merge occupied seats
+        data.tablesState.forEach((remoteTbl, idx) => {
+          remoteTbl.seats.forEach((seat, sIdx) => {
+            if (seat && (!tables[idx].seats[sIdx] || tables[idx].seats[sIdx].id !== myPlayerId)) {
+              tables[idx].seats[sIdx] = seat;
+            } else if (!seat && tables[idx].seats[sIdx] && tables[idx].seats[sIdx].id !== myPlayerId) {
+              tables[idx].seats[sIdx] = null;
+            }
+          });
+        });
+
+        // If I was waiting at this table and a remote human took seat, start match!
+        if (currentSeatedTable) {
+          const oppIdx = currentSeatIndex === 0 ? 1 : 0;
+          const remoteOpp = currentSeatedTable.seats[oppIdx];
+          if (remoteOpp && remoteOpp.id !== myPlayerId && !opponent) {
+            startMatch(remoteOpp);
+          }
+        }
+      } else if (data.type === 'QUESTION_ASKED' && currentSeatedTable && data.targetTable === currentSeatedTable.id && data.from !== myPlayerId) {
+        promptAnswerModal(data.question, data.answer);
+      } else if (data.type === 'ANSWER_SUBMITTED' && currentSeatedTable && data.from !== myPlayerId) {
+        handleAnswerResult(data.isCorrect, data.isCorrect ? "Opponent answered correctly!" : "Opponent answered incorrectly!");
+      }
+    };
+
+    /* ==========================================================
+       10. SHOP & INVENTORY
+       ========================================================== */
+    function openShop() {
+      renderShopCategory('chair-shop-grid', SHOP_CATALOG.chairs, 'chair');
+      renderShopCategory('table-shop-grid', SHOP_CATALOG.tables, 'table');
+      renderShopCategory('hat-shop-grid', SHOP_CATALOG.hats, 'hat');
+      document.getElementById('shop-modal').style.display = 'flex';
+    }
+    function closeShop() { document.getElementById('shop-modal').style.display = 'none'; }
+
+    function renderShopCategory(containerId, items, categoryKey) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      items.forEach(item => {
+        const isOwned = ownedItems.includes(item.id);
+        const isEquipped = equipped[categoryKey] === item.id;
+
+        const div = document.createElement('div');
+        div.className = 'shop-item';
+        div.innerHTML = `
+          <div class="shop-item-preview">${item.icon}</div>
+          <strong style="font-size:0.85rem;">${item.name}</strong>
+          <span style="font-size:0.75rem; color:var(--accent);">${item.price === 0 ? 'Free' : item.price + ' Coins'}</span>
+          <button class="btn ${isEquipped ? 'btn-accent' : ''}" style="width:100%; justify-content:center; font-size:0.75rem; padding:4px;"
+            onclick="handleShopItemAction('${item.id}', '${categoryKey}', ${item.price})">
+            ${isEquipped ? 'Equipped' : (isOwned ? 'Equip' : 'Buy')}
+          </button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function handleShopItemAction(itemId, categoryKey, price) {
+      if (!ownedItems.includes(itemId)) {
+        // Purchase
+        if (coins < price) {
+          showToast("Not enough coins to buy this item!");
+          return;
+        }
+        coins -= price;
+        ownedItems.push(itemId);
+        localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(ownedItems));
+        playBeep('coin');
+        showToast("Purchased item successfully!");
+      }
+      equipped[categoryKey] = itemId;
+      localStorage.setItem(STORAGE_KEY_EQUIPPED, JSON.stringify(equipped));
+      updateHud();
+      openShop(); // refresh view
+    }
+
+    /* ==========================================================
+       11. RULES & REPORT BOUNTY (Handwritten Rule 5: +10 Coins)
+       ========================================================== */
+    function openRules() { document.getElementById('rules-modal').style.display = 'flex'; }
+    function closeRules() { document.getElementById('rules-modal').style.display = 'none'; }
+    function openReportModal() { document.getElementById('report-modal').style.display = 'flex'; }
+    function closeReportModal() { document.getElementById('report-modal').style.display = 'none'; }
+
+    function confirmReport() {
+      const user = document.getElementById('report-user-input').value.trim();
+      if (!user) {
+        showToast("Please enter violator name or bot ID!");
+        return;
+      }
+      closeReportModal();
+      document.getElementById('report-user-input').value = '';
+
+      // Reward player per Handwritten Rule 5
+      coins += 10;
+      updateHud();
+      playBeep('win');
+      showToast(`🛡️ ${user} was banned! Handwritten Rule 5 reward: +10 Coins!`);
+    }
+
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    /* ==========================================================
+       12. PWA SERVICE WORKER REGISTRATION (Inline Blob)
+       ========================================================== */
+    if ('serviceWorker' in navigator) {
+      const swCode = `
+        self.addEventListener('install', (e) => self.skipWaiting());
+        self.addEventListener('activate', (e) => self.clients.claim());
+        self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request).catch(() => new Response('Offline'))));
+      `;
+      const blob = new Blob([swCode], { type: 'application/javascript' });
+      navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+    }
+
+    // Initialize Game
+    updateHud();
+    requestAnimationFrame(renderLoop);
+  </script>
+</body>
+</html>
