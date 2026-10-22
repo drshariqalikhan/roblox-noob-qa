@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Roblox Noob Q&amp;A Arena (Phaser Engine)</title>
+  <title>Roblox Noob Q&amp;A Arena</title>
   <meta name="theme-color" content="#101216">
 
-  <!-- Phaser 3 Game Engine Framework via CDN -->
+  <!-- Phaser 3 Framework -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
   <style>
@@ -34,11 +34,12 @@
     .btn:hover { background: #384050; }
     .btn-accent { background: var(--accent); color: #000; border-color: #caa000; }
     .btn-danger { background: var(--danger); color: #fff; border: none; }
+    .btn-bot { background: #8e44ad; color: #fff; border: none; }
+    .btn-bot:hover { background: #9b59b6; }
     
-    /* Phaser Game Container */
     #game-container { position: relative; flex: 1; overflow: hidden; width: 100%; height: 100%; }
 
-    #lobby-controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(20, 24, 33, 0.88); backdrop-filter: blur(8px); padding: 10px 18px; border-radius: 30px; border: 1px solid var(--card-border); display: flex; align-items: center; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 5; }
+    #lobby-controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(20, 24, 33, 0.92); backdrop-filter: blur(8px); padding: 10px 18px; border-radius: 30px; border: 1px solid var(--card-border); display: flex; align-items: center; gap: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 5; }
     .game-modal { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--card-bg); border: 2px solid var(--card-border); border-radius: 12px; width: 90%; max-width: 440px; padding: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.7); z-index: 20; }
     .game-modal h2 { font-size: 1.25rem; margin-bottom: 8px; color: var(--accent); display: flex; justify-content: space-between; }
     .modal-subtitle { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px; }
@@ -83,10 +84,10 @@
     </div>
   </header>
 
-  <!-- Phaser 3 Mount Target -->
   <div id="game-container">
     <div id="lobby-controls">
       <span id="match-status-text">Click an empty chair at a table to sit</span>
+      <button id="btn-force-bot" class="btn btn-bot" style="display:none;" onclick="requestBotOpponent()">🤖 Play with Computer Now</button>
       <button id="btn-stand-up" class="btn btn-danger" style="display:none;" onclick="standUp()">Leave Table</button>
     </div>
 
@@ -124,7 +125,7 @@
   <div id="rules-modal" class="overlay-modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h2 style="color:var(--accent);">📜 Official Handwritten Rules</h2>
+        <h2 style="color:var(--accent);">📜 Official Rules</h2>
         <button class="btn" onclick="closeRules()">✕</button>
       </div>
       <div class="modal-body">
@@ -143,7 +144,6 @@
           <ol>
             <li><strong>People can steal your coins. Watch out!</strong></li>
             <li><strong>One computer for players who just joined.</strong> (Noob is guaranteed to win against computer for 100 bonus coins!)</li>
-            <li><strong>The game can be glitchy.</strong> If so, please be patient with it.</li>
             <li><strong>Have Fun!</strong></li>
             <li><strong>Report rule violators immediately.</strong> (Earn <strong>+10 coins</strong> bounty reward!).</li>
           </ol>
@@ -188,16 +188,23 @@
 
   <script>
     /* ==========================================================
-       1. GAME STATE & AUDIO
+       1. GAME STATE & AUDIO SYNTHESIZER
        ========================================================== */
     let coins = parseInt(localStorage.getItem('roblox_noob_coins') || '0', 10);
     let firstGameDone = localStorage.getItem('roblox_noob_first_win_done') === 'true';
     let equipped = JSON.parse(localStorage.getItem('roblox_noob_equipped') || '{"hat":"hat_none"}');
 
-    let myPlayerId = null;
-    let myPlayerName = "Noob";
+    let myPlayerId = 'p_' + Math.random().toString(36).substring(2, 7);
+    let myPlayerName = "Noob_" + myPlayerId.substring(2);
     let seatedTableId = null;
     let seatedSeatIdx = null;
+
+    // Cache latest table state
+    let cachedTables = [
+      { id: 1, seats: [null, null], waitSeconds: 60 },
+      { id: 2, seats: [null, null], waitSeconds: 60 },
+      { id: 3, seats: [null, null], waitSeconds: 60 }
+    ];
 
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playBeep(type = 'blip') {
@@ -240,7 +247,7 @@
     }
 
     /* ==========================================================
-       2. PHASER 3 GAME SCENE IMPLEMENTATION
+       2. PHASER 3 ENGINE (Direct Interactive Seat Handling)
        ========================================================== */
     let phaserScene = null;
 
@@ -254,148 +261,141 @@
         const w = this.scale.width;
         const h = this.scale.height;
 
-        // 1. Sky & Clouds
+        // Sky & Clouds
         this.add.rectangle(w / 2, h * 0.225, w, h * 0.45, 0x1da1f2);
         this.clouds = [];
         for (let i = 0; i < 4; i++) {
-          const cloud = this.add.rectangle(Phaser.Math.Between(0, w), Phaser.Math.Between(30, h * 0.3), 100, 35, 0xffffff, 0.85);
-          this.clouds.push(cloud);
+          this.clouds.push(this.add.rectangle(Phaser.Math.Between(0, w), Phaser.Math.Between(30, h * 0.3), 110, 35, 0xffffff, 0.85));
         }
 
-        // 2. Grassy Field (Roblox green)
+        // Grass & Stud Grid
         this.add.rectangle(w / 2, h * 0.725, w, h * 0.55, 0x43a047);
+        this.add.grid(w / 2, h * 0.725, w, h * 0.55, 45, 45, null, null, 0x000000, 0.08);
 
-        // 3. Grid Lines (Roblox studs feel)
-        const grid = this.add.grid(w / 2, h * 0.725, w, h * 0.55, 45, 45, null, null, 0x000000, 0.08);
-
-        // 4. Tables & Chairs Containers
-        this.tableContainers = [];
+        // Build Tables & Interactive Chairs
+        this.tableDisplayData = [];
         const tablePositions = [0.22, 0.50, 0.78];
 
         for (let i = 0; i < 3; i++) {
           const tx = w * tablePositions[i];
           const ty = h * 0.65;
-          const tableGroup = this.createTable(i + 1, tx, ty);
-          this.tableContainers.push(tableGroup);
+          const tableId = i + 1;
+
+          // Table visual
+          this.add.ellipse(tx, ty + 20, 110, 30, 0x000000, 0.2);
+          this.add.rectangle(tx - 30, ty + 15, 8, 25, 0x3a200a);
+          this.add.rectangle(tx + 30, ty + 15, 8, 25, 0x3a200a);
+          this.add.rectangle(tx, ty - 10, 80, 26, 0x8B4513);
+          this.add.text(tx, ty + 42, `Table ${tableId} (2/2 Max)`, { fontSize: '11px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
+
+          const chairOffsets = [-55, 55];
+          const chairs = [];
+
+          for (let seatIdx = 0; seatIdx < 2; seatIdx++) {
+            const cx = tx + chairOffsets[seatIdx];
+            const cy = ty - 10;
+
+            // Chair graphics
+            const stool = this.add.rectangle(cx, cy + 10, 30, 22, 0x5c3a21);
+            const back = this.add.rectangle(cx, cy - 10, 30, 20, 0x5c3a21);
+            const promptText = this.add.text(cx, cy - 28, 'CLICK TO SIT', { fontSize: '9px', fontStyle: 'bold', color: '#ffcc00' }).setOrigin(0.5);
+
+            // Top-level direct interactive zone
+            const hitRect = this.add.rectangle(cx, cy, 54, 70, 0xffffff, 0.001)
+              .setInteractive({ cursor: 'pointer' });
+
+            hitRect.on('pointerover', () => promptText.setScale(1.2));
+            hitRect.on('pointerout', () => promptText.setScale(1.0));
+            hitRect.on('pointerdown', () => {
+              if (seatedTableId === null) {
+                sitDown(tableId, seatIdx);
+              }
+            });
+
+            chairs.push({ cx, cy, promptText, hitRect, avatarContainer: null });
+          }
+
+          this.tableDisplayData.push({ id: tableId, chairs });
         }
 
-        // Window resize handler
-        this.scale.on('resize', this.resize, this);
+        // Global pointer fallback to ensure click detection on mobile/touch
+        this.input.on('pointerdown', (pointer) => {
+          if (seatedTableId !== null) return;
+          this.tableDisplayData.forEach(t => {
+            t.chairs.forEach((c, seatIdx) => {
+              if (Phaser.Math.Distance.Between(pointer.x, pointer.y, c.cx, c.cy) < 40) {
+                sitDown(t.id, seatIdx);
+              }
+            });
+          });
+        });
+
+        // Apply any state that arrived before Phaser finished loading
+        this.syncWithState(cachedTables);
       }
 
       update() {
-        // Drift clouds using Phaser game loop
         this.clouds.forEach(c => {
           c.x += 0.3;
           if (c.x > this.scale.width + 80) c.x = -80;
         });
       }
 
-      createTable(tableId, x, y) {
-        const container = this.add.container(x, y);
+      syncWithState(tables) {
+        if (!this.tableDisplayData) return;
 
-        // Wooden Table Surface & Legs
-        const tableShadow = this.add.ellipse(0, 20, 110, 30, 0x000000, 0.2);
-        const legLeft = this.add.rectangle(-30, 15, 8, 25, 0x3a200a);
-        const legRight = this.add.rectangle(30, 15, 8, 25, 0x3a200a);
-        const top = this.add.rectangle(0, -10, 80, 26, 0x8B4513);
-        const label = this.add.text(0, 42, `Table ${tableId} (2/2 Max)`, {
-          fontSize: '11px',
-          fontStyle: 'bold',
-          color: '#ffffff'
-        }).setOrigin(0.5);
+        tables.forEach((tData, tIdx) => {
+          const tDisplay = this.tableDisplayData[tIdx];
+          if (!tDisplay) return;
 
-        container.add([tableShadow, legLeft, legRight, top, label]);
+          tData.seats.forEach((seatData, sIdx) => {
+            const chair = tDisplay.chairs[sIdx];
+            if (!chair) return;
 
-        // 2 Chairs with native Phaser .setInteractive() click zones
-        const chairs = [];
-        const chairOffsets = [-55, 55];
+            if (chair.avatarContainer) {
+              chair.avatarContainer.destroy();
+              chair.avatarContainer = null;
+            }
 
-        for (let seatIdx = 0; seatIdx < 2; seatIdx++) {
-          const cx = chairOffsets[seatIdx];
-          const chairCont = this.add.container(cx, -10);
-
-          const stool = this.add.rectangle(0, 10, 30, 22, 0x5c3a21);
-          const back = this.add.rectangle(0, -10, 30, 20, 0x5c3a21);
-          const promptText = this.add.text(0, -28, 'SIT', {
-            fontSize: '10px',
-            fontStyle: 'bold',
-            color: '#ffcc00'
-          }).setOrigin(0.5);
-
-          // Interactive zone using Phaser Engine
-          const hitZone = this.add.zone(0, 0, 45, 60).setInteractive({ cursor: 'pointer' });
-
-          hitZone.on('pointerover', () => {
-            promptText.setScale(1.2);
-          });
-          hitZone.on('pointerout', () => {
-            promptText.setScale(1.0);
-          });
-          hitZone.on('pointerdown', () => {
-            if (seatedTableId === null) {
-              sitDown(tableId, seatIdx);
+            if (seatData) {
+              chair.promptText.setVisible(false);
+              chair.avatarContainer = this.createNoobContainer(chair.cx, chair.cy - 15, seatData);
+            } else {
+              chair.promptText.setVisible(true);
             }
           });
-
-          chairCont.add([stool, back, promptText, hitZone]);
-          container.add(chairCont);
-
-          chairs.push({
-            container: chairCont,
-            promptText: promptText,
-            hitZone: hitZone,
-            noobAvatar: null
-          });
-        }
-
-        return { id: tableId, container, chairs };
+        });
       }
 
-      // Build a complete modular Roblox Noob container
-      createNoobContainer(playerData) {
-        const noob = this.add.container(0, -22);
+      createNoobContainer(x, y, playerData) {
+        const noob = this.add.container(x, y);
 
-        // Shadow
         const shadow = this.add.ellipse(0, 25, 30, 10, 0x000000, 0.25);
-
-        // Legs (Roblox Green)
         const leftLeg = this.add.rectangle(-6, 12, 10, 18, 0x00a651);
         const rightLeg = this.add.rectangle(6, 12, 10, 18, 0x00a651);
-
-        // Torso (Roblox Blue)
         const torso = this.add.rectangle(0, -4, 26, 20, 0x0055bf);
-
-        // Arms (Roblox Yellow)
         const leftArm = this.add.rectangle(-17, -4, 8, 18, 0xffe800);
         const rightArm = this.add.rectangle(17, -4, 8, 18, 0xffe800);
-
-        // Head (Roblox Yellow)
         const head = this.add.rectangle(0, -19, 18, 16, 0xffe800);
-
-        // Smiley :)
         const leftEye = this.add.rectangle(-4, -21, 2, 3, 0x000000);
         const rightEye = this.add.rectangle(4, -21, 2, 3, 0x000000);
         const smile = this.add.arc(0, -16, 4, 20, 160, false, 0x000000);
 
-        // Tag (Name & Coins)
         const tagBg = this.add.rectangle(0, -44, 90, 22, 0x000000, 0.75);
         const nameText = this.add.text(0, -49, playerData.name, { fontSize: '10px', fontStyle: 'bold', color: '#fff' }).setOrigin(0.5);
         const coinText = this.add.text(0, -38, `💰 ${playerData.coins} coins`, { fontSize: '9px', color: '#ffcc00' }).setOrigin(0.5);
 
         noob.add([shadow, leftLeg, rightLeg, torso, leftArm, rightArm, head, leftEye, rightEye, smile, tagBg, nameText, coinText]);
 
-        // Hat accessory
         if (playerData.hat === 'hat_cap') {
-          const cap = this.add.rectangle(0, -27, 22, 5, 0xff0033);
-          const brim = this.add.rectangle(4, -25, 26, 2, 0xff0033);
-          noob.add([cap, brim]);
+          noob.add([
+            this.add.rectangle(0, -27, 22, 5, 0xff0033),
+            this.add.rectangle(4, -25, 26, 2, 0xff0033)
+          ]);
         } else if (playerData.hat === 'hat_crown') {
-          const crown = this.add.rectangle(0, -29, 20, 6, 0xffd700);
-          noob.add(crown);
+          noob.add(this.add.rectangle(0, -29, 20, 6, 0xffd700));
         }
 
-        // Idle Bobbing Animation via Phaser Tween Engine
         this.tweens.add({
           targets: noob,
           y: '-=3',
@@ -408,7 +408,6 @@
         return noob;
       }
 
-      // Floating text effect when coins are stolen
       spawnCoinFloat(x, y, text, color) {
         const floatText = this.add.text(x, y, text, {
           fontSize: '18px',
@@ -427,19 +426,14 @@
           onComplete: () => floatText.destroy()
         });
       }
-
-      resize(gameSize) {
-        // Redraw scene responsive layout if window is resized
-        this.scene.restart();
-      }
     }
 
-    // Phaser Engine Config
+    const containerEl = document.getElementById('game-container');
     const config = {
       type: Phaser.AUTO,
       parent: 'game-container',
-      width: window.innerWidth,
-      height: window.innerHeight,
+      width: containerEl.clientWidth || window.innerWidth,
+      height: containerEl.clientHeight || (window.innerHeight - 60),
       transparent: false,
       scene: [ArenaScene],
       scale: {
@@ -447,47 +441,85 @@
         autoCenter: Phaser.Scale.CENTER_BOTH
       }
     };
-
     const phaserGame = new Phaser.Game(config);
 
     /* ==========================================================
-       3. WEBSOCKET SYNC WITH NODE BACKEND (server.js)
+       3. WEBSOCKET NETWORKING & MATCHMAKING
        ========================================================== */
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}`);
+    let ws = null;
+    let isConnected = false;
 
-    ws.onopen = () => {
-      showToast("Connected to live server!");
-      ws.send(JSON.stringify({
-        type: 'SYNC_PROFILE',
-        coins: coins,
-        hat: equipped.hat,
-        firstGameDone: firstGameDone
-      }));
-    };
+    function initSocket() {
+      try {
+        ws = new WebSocket(`${protocol}//${window.location.host}`);
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+        ws.onopen = () => {
+          isConnected = true;
+          showToast("Connected to live server!");
+          ws.send(JSON.stringify({
+            type: 'SYNC_PROFILE',
+            coins: coins,
+            hat: equipped.hat,
+            firstGameDone: firstGameDone
+          }));
+        };
+
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          handleServerPacket(data);
+        };
+
+        ws.onerror = () => { fallbackToOffline(); };
+        ws.onclose = () => { isConnected = false; };
+      } catch (e) {
+        fallbackToOffline();
+      }
+    }
+
+    function fallbackToOffline() {
+      isConnected = false;
+      showToast("Playing in Offline/Local Mode with Computer!");
+    }
+
+    initSocket();
+
+    function handleServerPacket(data) {
       switch (data.type) {
         case 'INIT_STATE':
           myPlayerId = data.playerId;
           myPlayerName = data.name;
-          syncPhaserTables(data.tables);
+          cachedTables = data.tables;
+          if (phaserScene) phaserScene.syncWithState(data.tables);
           updateServerBadge(data.serverPlayerCount, data.maxPlayers);
           break;
         case 'SERVER_INFO':
           updateServerBadge(data.count, 13);
-          syncPhaserTables(data.tables);
+          cachedTables = data.tables;
+          if (phaserScene) phaserScene.syncWithState(data.tables);
           break;
         case 'TABLE_UPDATE':
-          syncPhaserTables(data.tables);
-          break;
-        case 'SERVER_FULL':
-          alert(data.message);
+          cachedTables = data.tables;
+          if (phaserScene) phaserScene.syncWithState(data.tables);
+
+          // Update lobby HUD timer
+          if (seatedTableId !== null) {
+            const tbl = data.tables.find(t => t.id === seatedTableId);
+            if (tbl) {
+              const otherSeat = tbl.seats[seatedSeatIdx === 0 ? 1 : 0];
+              if (!otherSeat) {
+                document.getElementById('match-status-text').innerText = `Waiting for human player... (${tbl.waitSeconds}s)`;
+                document.getElementById('btn-force-bot').style.display = 'inline-flex';
+              } else {
+                document.getElementById('btn-force-bot').style.display = 'none';
+              }
+            }
+          }
           break;
         case 'START_TUTORIAL_MATCH':
           showToast(data.message);
           document.getElementById('match-status-text').innerText = "First game vs Computer (Guaranteed Win)!";
+          document.getElementById('btn-force-bot').style.display = 'none';
           setTimeout(() => openAskModal(), 1000);
           break;
         case 'FIRST_WIN_COMPLETED':
@@ -501,10 +533,13 @@
           break;
         case 'PROMPT_ASK':
           showToast(`Your turn to ask a question to ${data.opponentName}!`);
+          document.getElementById('match-status-text').innerText = `Dueling against ${data.opponentName}!`;
+          document.getElementById('btn-force-bot').style.display = 'none';
           openAskModal();
           break;
         case 'WAITING_FOR_QUESTION':
           document.getElementById('match-status-text').innerText = `Waiting for ${data.opponentName} to ask a question...`;
+          document.getElementById('btn-force-bot').style.display = 'none';
           break;
         case 'PROMPT_ANSWER':
           promptAnswerModal(data.question, data.askerName);
@@ -535,71 +570,66 @@
         case 'OPPONENT_LEFT':
           showToast(data.message);
           document.getElementById('match-status-text').innerText = "Opponent left. Waiting for another player...";
+          document.getElementById('btn-force-bot').style.display = 'inline-flex';
           break;
         case 'ACTION_FAILED':
           showToast(data.message);
           break;
       }
-    };
-
-    function syncPhaserTables(tablesData) {
-      if (!phaserScene || !phaserScene.tableContainers) return;
-
-      tablesData.forEach((tData, tIdx) => {
-        const tableGroup = phaserScene.tableContainers[tIdx];
-        if (!tableGroup) return;
-
-        tData.seats.forEach((seatData, sIdx) => {
-          const chair = tableGroup.chairs[sIdx];
-          if (!chair) return;
-
-          // Remove old avatar if state changed
-          if (chair.noobAvatar) {
-            chair.noobAvatar.destroy();
-            chair.noobAvatar = null;
-          }
-
-          if (seatData) {
-            chair.promptText.setVisible(false);
-            chair.hitZone.disableInteractive();
-            chair.noobAvatar = phaserScene.createNoobContainer(seatData);
-            chair.container.add(chair.noobAvatar);
-          } else {
-            chair.promptText.setVisible(true);
-            chair.hitZone.setInteractive();
-          }
-        });
-
-        // Update 60s countdown banner if seated
-        if (seatedTableId === tData.id) {
-          const otherSeat = tData.seats[seatedSeatIdx === 0 ? 1 : 0];
-          if (!otherSeat && tData.waitSeconds !== undefined) {
-            document.getElementById('match-status-text').innerText = `Waiting for real human to join... (${tData.waitSeconds}s)`;
-          }
-        }
-      });
     }
 
     function sitDown(tableId, seatIdx) {
       seatedTableId = tableId;
       seatedSeatIdx = seatIdx;
-      document.getElementById('btn-stand-up').style.display = 'inline-block';
+      document.getElementById('btn-stand-up').style.display = 'inline-flex';
+      document.getElementById('btn-force-bot').style.display = 'inline-flex';
       playBeep('blip');
 
-      ws.send(JSON.stringify({
-        type: 'SIT_AT_TABLE',
-        tableId: tableId,
-        seatIdx: seatIdx
-      }));
+      if (isConnected && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'SIT_AT_TABLE',
+          tableId: tableId,
+          seatIdx: seatIdx
+        }));
+      } else {
+        // Instant local/offline fallback match with Computer
+        startLocalComputerMatch(tableId, seatIdx);
+      }
+    }
+
+    function requestBotOpponent() {
+      if (isConnected && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'FORCE_COMPUTER_OPPONENT' }));
+        document.getElementById('btn-force-bot').style.display = 'none';
+      } else {
+        startLocalComputerMatch(seatedTableId, seatedSeatIdx);
+      }
+    }
+
+    function startLocalComputerMatch(tableId, seatIdx) {
+      document.getElementById('btn-force-bot').style.display = 'none';
+      const botSeatIdx = seatIdx === 0 ? 1 : 0;
+      cachedTables[tableId - 1].seats[seatIdx] = { id: myPlayerId, name: myPlayerName, coins, hat: equipped.hat };
+      cachedTables[tableId - 1].seats[botSeatIdx] = { id: 'bot_local', name: 'Computer_Bot', coins: 60, hat: 'hat_cap' };
+      if (phaserScene) phaserScene.syncWithState(cachedTables);
+
+      document.getElementById('match-status-text').innerText = "Dueling Computer_Bot!";
+      showToast("Computer opponent joined!");
+      setTimeout(() => openAskModal(), 1000);
     }
 
     function standUp() {
-      if (seatedTableId !== null) {
+      if (seatedTableId !== null && isConnected && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'STAND_UP' }));
+      }
+      if (seatedTableId !== null) {
+        cachedTables[seatedTableId - 1].seats = [null, null];
+        if (phaserScene) phaserScene.syncWithState(cachedTables);
       }
       seatedTableId = null;
       seatedSeatIdx = null;
       document.getElementById('btn-stand-up').style.display = 'none';
+      document.getElementById('btn-force-bot').style.display = 'none';
       document.getElementById('match-status-text').innerText = "Click an empty chair at a table to sit";
       closeModal('modal-ask');
       closeModal('modal-answer');
@@ -607,7 +637,7 @@
     }
 
     /* ==========================================================
-       4. DUEL MODALS & ACTIONS
+       4. DUEL DIALOGS & ACTIONS
        ========================================================== */
     function openAskModal() {
       document.getElementById('ask-question-input').value = '';
@@ -623,12 +653,33 @@
         return;
       }
       closeModal('modal-ask');
-      ws.send(JSON.stringify({
-        type: 'SUBMIT_QUESTION',
-        question: q,
-        answer: a
-      }));
-      showToast("Question sent to opponent!");
+
+      if (isConnected && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'SUBMIT_QUESTION', question: q, answer: a }));
+        showToast("Question sent to opponent!");
+      } else {
+        // Local AI resolution
+        showToast("Question sent to Computer!");
+        setTimeout(() => {
+          const aiCorrect = !firstGameDone ? false : Math.random() < 0.35;
+          if (aiCorrect) {
+            coins = Math.max(0, coins - 30);
+            playBeep('oof');
+            showToast("Computer answered correctly! Stole 30 coins from you!");
+          } else {
+            coins += 30;
+            playBeep('coin');
+            showToast("Computer answered wrong! You stole 30 coins!");
+            if (!firstGameDone) {
+              firstGameDone = true;
+              localStorage.setItem('roblox_noob_first_win_done', 'true');
+              coins += 100;
+              showToast("🎉 FIRST WIN BONUS: +100 Coins Awarded!");
+            }
+          }
+          updateHud();
+        }, 1500);
+      }
     }
 
     function promptAnswerModal(questionText, askerName) {
@@ -654,10 +705,10 @@
       clearInterval(window.ansTimerInterval);
       const userAns = document.getElementById('player-answer-input').value.trim();
       closeModal('modal-answer');
-      ws.send(JSON.stringify({
-        type: 'SUBMIT_ANSWER',
-        answer: userAns
-      }));
+
+      if (isConnected && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'SUBMIT_ANSWER', answer: userAns }));
+      }
     }
 
     function updateHud() {
@@ -687,7 +738,15 @@
       if (!target) return;
       closeReportModal();
       document.getElementById('report-user-input').value = '';
-      ws.send(JSON.stringify({ type: 'REPORT_VIOLATOR', targetName: target }));
+
+      if (isConnected && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'REPORT_VIOLATOR', targetName: target }));
+      } else {
+        coins += 10;
+        updateHud();
+        playBeep('win');
+        showToast(`Report filed for "${target}". Banned! Claimed +10 coins bounty!`);
+      }
     }
 
     function openShop() {
@@ -719,7 +778,9 @@
       equipped.hat = id;
       localStorage.setItem('roblox_noob_equipped', JSON.stringify(equipped));
       updateHud();
-      ws.send(JSON.stringify({ type: 'SYNC_PROFILE', coins, hat: id, firstGameDone }));
+      if (isConnected && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'SYNC_PROFILE', coins, hat: id, firstGameDone }));
+      }
       showToast("Item equipped!");
       closeShop();
     }

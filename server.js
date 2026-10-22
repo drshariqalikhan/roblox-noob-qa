@@ -8,8 +8,8 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 const PORT = process.env.PORT || 3000;
-const MAX_SERVER_PLAYERS = 13; // Rule 5: "The max people in the Server is 13."
-const MAX_COIN_STEAL = 30;     // Rule 2: "The max coins you can take is 30."
+const MAX_SERVER_PLAYERS = 13; // Rule 5: Server capacity 13
+const MAX_COIN_STEAL = 30;     // Rule 2: Max coins you can take is 30
 
 // Serve index.html statically
 app.use(express.static(__dirname));
@@ -24,7 +24,6 @@ const tables = [
   { id: 3, seats: [null, null], duelState: null, waitTimer: null, waitSeconds: 60 }
 ];
 
-// Connected players registry: { socketId: { ws, id, name, coins, hat, chair, tableId, firstGameDone } }
 const players = new Map();
 
 function broadcast(payload) {
@@ -59,9 +58,8 @@ function sendToPlayer(playerId, payload) {
 }
 
 wss.on('connection', (ws) => {
-  // Enforce handwritten Rule 5: Server capacity 13
   if (players.size >= MAX_SERVER_PLAYERS) {
-    ws.send(JSON.stringify({ type: 'SERVER_FULL', message: 'Server is full (13/13 max players). Try again later!' }));
+    ws.send(JSON.stringify({ type: 'SERVER_FULL', message: 'Server is full (13/13 max players).' }));
     ws.close();
     return;
   }
@@ -81,7 +79,6 @@ wss.on('connection', (ws) => {
   };
   players.set(playerId, playerData);
 
-  // Send initial state to the connecting player
   ws.send(JSON.stringify({
     type: 'INIT_STATE',
     playerId: playerId,
@@ -91,7 +88,6 @@ wss.on('connection', (ws) => {
     maxPlayers: MAX_SERVER_PLAYERS
   }));
 
-  // Notify everyone of updated server player count
   broadcast({
     type: 'SERVER_INFO',
     count: players.size,
@@ -132,14 +128,12 @@ function handlePlayerLeave(player) {
       const oppIdx = player.seatIdx === 0 ? 1 : 0;
       const opponent = table.seats[oppIdx];
 
-      // If opponent was a human, notify them of forfeit/leave
       if (opponent && !opponent.isBot) {
         sendToPlayer(opponent.id, {
           type: 'OPPONENT_LEFT',
           message: `${player.name} left the table.`
         });
       } else if (opponent && opponent.isBot) {
-        // Clean up bot
         table.seats[oppIdx] = null;
       }
 
@@ -166,7 +160,7 @@ function handleMessage(player, data) {
 
       const seatIdx = data.seatIdx;
       if (table.seats[seatIdx] !== null || player.tableId !== null) {
-        player.ws.send(JSON.stringify({ type: 'ACTION_FAILED', message: 'Chair is unavailable or you are already seated.' }));
+        player.ws.send(JSON.stringify({ type: 'ACTION_FAILED', message: 'Chair is occupied or you are already seated.' }));
         return;
       }
 
@@ -180,8 +174,7 @@ function handleMessage(player, data) {
         isBot: false
       };
 
-      // Rule 2: Gameplay Rules
-      // If it's player's first time, play against Easy Computer guaranteed to win (+100 coins)
+      // Guaranteed win tutorial for brand new players
       if (!player.firstGameDone) {
         const otherIdx = seatIdx === 0 ? 1 : 0;
         const tutorialBot = {
@@ -210,15 +203,14 @@ function handleMessage(player, data) {
       const existingOpp = table.seats[oppIdx];
 
       if (existingOpp) {
-        // Real player was already waiting! Clear countdown & start duel
         if (table.waitTimer) {
           clearInterval(table.waitTimer);
           table.waitTimer = null;
           table.waitSeconds = 60;
         }
-        startHumanDuel(table, table.seats[0], table.seats[1]);
+        startDuel(table, table.seats[0], table.seats[1]);
       } else {
-        // Wait 60 seconds for a human player (as specified)
+        // Wait 60s for human, or user can click "Play with Computer Now"
         table.waitSeconds = 60;
         broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
 
@@ -230,22 +222,24 @@ function handleMessage(player, data) {
           } else {
             clearInterval(table.waitTimer);
             table.waitTimer = null;
-
-            // 60s elapsed: Computer joins!
-            const computerPlayer = {
-              id: 'bot_' + Math.random().toString(36).substring(2, 6),
-              name: 'Roblox_AI_Bot',
-              coins: 60,
-              hat: 'hat_cap',
-              isBot: true
-            };
-            table.seats[oppIdx] = computerPlayer;
-            startHumanDuel(table, table.seats[seatIdx], computerPlayer);
+            spawnComputerOpponent(table, player);
           }
         }, 1000);
       }
 
       broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
+      break;
+    }
+
+    // Instant Computer Opponent trigger
+    case 'FORCE_COMPUTER_OPPONENT': {
+      const table = tables.find(t => t.id === player.tableId);
+      if (!table) return;
+      if (table.waitTimer) {
+        clearInterval(table.waitTimer);
+        table.waitTimer = null;
+      }
+      spawnComputerOpponent(table, player);
       break;
     }
 
@@ -264,25 +258,21 @@ function handleMessage(player, data) {
       table.duelState.secretQuestion = question.trim();
       table.duelState.secretAnswer = answer.trim().toLowerCase();
 
-      // Check if opponent is bot or human
       const oppIdx = player.seatIdx === 0 ? 1 : 0;
       const opponent = table.seats[oppIdx];
 
       if (opponent.isBot) {
         if (table.duelState.isTutorial) {
-          // Tutorial bot deliberately fails to guarantee win
           setTimeout(() => {
             resolveDuelRound(table, false, "Computer guessed: 'uhh... 42?'");
-          }, 1500);
+          }, 1200);
         } else {
-          // Standard AI opponent: 40% chance of guessing correct
-          const aiCorrect = Math.random() < 0.4;
+          const aiCorrect = Math.random() < 0.35;
           setTimeout(() => {
             resolveDuelRound(table, aiCorrect, aiCorrect ? "Computer guessed correctly!" : "Computer guessed wrong!");
-          }, 1800);
+          }, 1500);
         }
       } else {
-        // Send question to opposing human (keep answer secret on server to prevent exploits per Rule 4!)
         sendToPlayer(opponent.id, {
           type: 'PROMPT_ANSWER',
           question: question,
@@ -302,11 +292,9 @@ function handleMessage(player, data) {
       break;
     }
 
-    // Rule 5: Report Violator / Bot (+10 coin bounty)
     case 'REPORT_VIOLATOR': {
       const targetName = (data.targetName || '').trim();
-      // Grant +10 coins bounty
-      player.coins += 10;
+      player.coins += 10; // Rule 5: 10 coins bounty
       sendToPlayer(player.id, {
         type: 'REPORT_SUCCESS',
         bounty: 10,
@@ -318,7 +306,22 @@ function handleMessage(player, data) {
   }
 }
 
-function startHumanDuel(table, p1, p2) {
+function spawnComputerOpponent(table, player) {
+  const oppIdx = player.seatIdx === 0 ? 1 : 0;
+  if (table.seats[oppIdx] !== null) return;
+
+  const computerPlayer = {
+    id: 'bot_' + Math.random().toString(36).substring(2, 6),
+    name: 'Roblox_AI_Bot',
+    coins: 60,
+    hat: 'hat_cap',
+    isBot: true
+  };
+  table.seats[oppIdx] = computerPlayer;
+  startDuel(table, table.seats[player.seatIdx], computerPlayer);
+}
+
+function startDuel(table, p1, p2) {
   table.duelState = {
     askerId: p1.id,
     secretQuestion: null,
@@ -328,7 +331,6 @@ function startHumanDuel(table, p1, p2) {
 
   broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
 
-  // P1 asks first
   if (!p1.isBot) {
     sendToPlayer(p1.id, { type: 'PROMPT_ASK', opponentName: p2.name });
   }
@@ -349,14 +351,12 @@ function resolveDuelRound(table, opponentGotCorrect, reason) {
   let winner, loser, stolen;
 
   if (opponentGotCorrect) {
-    // Opponent (answerer) steals up to 30 coins from asker (Rule 2)
     winner = answerer;
     loser = asker;
     stolen = Math.min(loser.coins, MAX_COIN_STEAL);
     loser.coins -= stolen;
     winner.coins += stolen;
   } else {
-    // Asker steals up to 30 coins from opponent (answerer) (Rule 2)
     winner = asker;
     loser = answerer;
     stolen = Math.min(loser.coins, MAX_COIN_STEAL);
@@ -364,11 +364,10 @@ function resolveDuelRound(table, opponentGotCorrect, reason) {
     winner.coins += stolen;
   }
 
-  // Handle Tutorial Completion
   if (table.duelState.isTutorial) {
     const humanPlayer = players.get(asker.id);
     if (humanPlayer) {
-      humanPlayer.coins += 100; // Guaranteed 100 coins
+      humanPlayer.coins += 100;
       humanPlayer.firstGameDone = true;
       asker.coins = humanPlayer.coins;
       sendToPlayer(humanPlayer.id, {
@@ -377,14 +376,12 @@ function resolveDuelRound(table, opponentGotCorrect, reason) {
         message: '🎉 Guaranteed first win! +100 bonus coins awarded!'
       });
     }
-    // Clean up table
     table.seats[1] = null;
     table.duelState = null;
     broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
     return;
   }
 
-  // Broadcast Round Outcome
   const resultPayload = {
     type: 'ROUND_RESULT',
     winnerName: winner.name,
@@ -396,7 +393,6 @@ function resolveDuelRound(table, opponentGotCorrect, reason) {
   if (!asker.isBot) sendToPlayer(asker.id, resultPayload);
   if (!answerer.isBot) sendToPlayer(answerer.id, resultPayload);
 
-  // Check if someone lost all coins
   if (loser.coins <= 0) {
     const gameOverPayload = {
       type: 'MATCH_OVER',
@@ -407,14 +403,12 @@ function resolveDuelRound(table, opponentGotCorrect, reason) {
     if (!asker.isBot) sendToPlayer(asker.id, gameOverPayload);
     if (!answerer.isBot) sendToPlayer(answerer.id, gameOverPayload);
 
-    // End match & clear table
     table.seats = [null, null];
     table.duelState = null;
     broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
     return;
   }
 
-  // Swap turns: answerer now asks next question
   table.duelState.askerId = answerer.id;
   table.duelState.secretQuestion = null;
   table.duelState.secretAnswer = null;
@@ -425,10 +419,9 @@ function resolveDuelRound(table, opponentGotCorrect, reason) {
     if (!answerer.isBot) {
       sendToPlayer(answerer.id, { type: 'PROMPT_ASK', opponentName: asker.name });
     } else {
-      // Bot generates a question
       botAskQuestion(table, asker);
     }
-  }, 2000);
+  }, 1800);
 }
 
 function botAskQuestion(table, humanPlayer) {
