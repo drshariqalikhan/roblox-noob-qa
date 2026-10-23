@@ -6,8 +6,17 @@
   <title>Roblox Noob Q&amp;A Arena</title>
   <meta name="theme-color" content="#101216">
 
-  <!-- Phaser 3 Framework -->
+  <!-- 1. Phaser 3 Game Engine Framework -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+
+  <!-- 2. Supabase Client Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- 3. Dynamic Environment Configuration (from server.js) -->
+  <script src="/config.js"></script>
+
+  <!-- 4. Dedicated Database & Device Auth Manager -->
+  <script src="supabase.js"></script>
 
   <style>
     :root {
@@ -21,8 +30,10 @@
       --text-main: #f1f2f6;
       --text-muted: #a4b0be;
     }
-    * { box-sizing: border-box; user-select: none; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+    * { box-sizing: border-box; user-select: none; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     body { background-color: var(--bg-dark); color: var(--text-main); overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+    
+    /* Top Dark Header */
     header { background: rgba(18, 20, 26, 0.95); border-bottom: 2px solid var(--card-border); padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
     .brand { display: flex; align-items: center; gap: 10px; }
     .brand-icon { width: 32px; height: 32px; background: #ffe800; border: 2px solid #000; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 900; color: #000; box-shadow: 2px 2px 0px #000; }
@@ -30,45 +41,57 @@
     .stats-bar { display: flex; align-items: center; gap: 10px; }
     .badge { display: flex; align-items: center; gap: 6px; background: #242933; padding: 6px 12px; border-radius: 20px; border: 1px solid var(--card-border); font-size: 0.85rem; font-weight: 600; }
     .coin-badge { color: var(--accent); border-color: rgba(255, 204, 0, 0.3); }
-    .btn { background: #2b313e; color: var(--text-main); border: 1px solid var(--card-border); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+    .btn { background: #2b313e; color: var(--text-main); border: 1px solid var(--card-border); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; transition: background 0.2s; }
     .btn:hover { background: #384050; }
     .btn-accent { background: var(--accent); color: #000; border-color: #caa000; }
+    .btn-accent:hover { background: var(--accent-hover); }
     .btn-danger { background: var(--danger); color: #fff; border: none; }
     .btn-bot { background: #8e44ad; color: #fff; border: none; }
     .btn-bot:hover { background: #9b59b6; }
     
+    /* Phaser Game Viewport */
     #game-container { position: relative; flex: 1; overflow: hidden; width: 100%; height: 100%; }
 
+    /* Bottom Lobby Controls */
     #lobby-controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(20, 24, 33, 0.92); backdrop-filter: blur(8px); padding: 10px 18px; border-radius: 30px; border: 1px solid var(--card-border); display: flex; align-items: center; gap: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 5; }
+
+    /* In-Game Question/Answer Modals */
     .game-modal { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--card-bg); border: 2px solid var(--card-border); border-radius: 12px; width: 90%; max-width: 440px; padding: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.7); z-index: 20; }
     .game-modal h2 { font-size: 1.25rem; margin-bottom: 8px; color: var(--accent); display: flex; justify-content: space-between; }
     .modal-subtitle { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px; }
     .input-group { margin-bottom: 14px; }
-    .input-group label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; }
+    .input-group label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
     input[type="text"] { width: 100%; padding: 10px 12px; background: #111317; border: 1px solid var(--card-border); border-radius: 6px; color: #fff; font-size: 0.95rem; outline: none; }
-    input[type="text"]:focus { border-color: var(--accent); }
+    input[type="color"] { width: 100%; height: 42px; background: #111317; border: 1px solid var(--card-border); border-radius: 6px; cursor: pointer; }
+    input:focus { border-color: var(--accent); }
+    
     .timer-bar { height: 4px; background: #333; border-radius: 2px; overflow: hidden; margin-bottom: 12px; }
     .timer-progress { height: 100%; background: var(--accent); width: 100%; transition: width 1s linear; }
-    .overlay-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); z-index: 30; justify-content: center; align-items: center; padding: 15px; }
-    .modal-content { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; width: 100%; max-width: 580px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; }
+    
+    /* Full Overlay Modals (Rules, Shop, Customizer) */
+    .overlay-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 30; justify-content: center; align-items: center; padding: 15px; }
+    .modal-content { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; width: 100%; max-width: 480px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
     .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; }
     .modal-body { padding: 20px; overflow-y: auto; font-size: 0.9rem; line-height: 1.5; }
+    
     .rule-section { background: #12141a; border-radius: 8px; padding: 14px; margin-bottom: 14px; border-left: 4px solid var(--accent); }
-    .rule-section ol { padding-left: 20px; }
+    .rule-section ol { padding-left: 20px; color: #cbd5e1; }
     .rule-section li { margin-bottom: 6px; }
     .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
     .shop-item { background: #12141a; border: 1px solid var(--card-border); border-radius: 8px; padding: 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+
     #toast { position: absolute; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px); background: #242933; border: 1px solid var(--accent); color: #fff; padding: 10px 22px; border-radius: 20px; font-size: 0.9rem; font-weight: 600; transition: transform 0.3s ease; z-index: 50; pointer-events: none; }
     #toast.show { transform: translateX(-50%) translateY(0); }
   </style>
 </head>
 <body>
 
+  <!-- Top Dark Header HUD -->
   <header>
     <div class="brand">
       <div class="brand-icon">OOF</div>
       <div>
-        <h1>Noob Q&amp;A Arena</h1>
+        <h1 id="hud-player-name">Noob Q&amp;A Arena</h1>
         <small id="server-capacity-badge" style="color:var(--text-muted); font-size:0.72rem;">Server Capacity: 1 / 13 Players</small>
       </div>
     </div>
@@ -78,12 +101,14 @@
         <span>💰</span>
         <span id="player-coins">0</span> Coins
       </div>
+      <button class="btn" onclick="openCustomizerModal()">🎨 Edit Noob</button>
       <button class="btn" onclick="openShop()">🛒 Shop</button>
       <button class="btn" onclick="openRules()">📜 Rules</button>
       <button class="btn btn-danger" onclick="openReportModal()">🚨 Report</button>
     </div>
   </header>
 
+  <!-- Phaser Canvas Game Area -->
   <div id="game-container">
     <div id="lobby-controls">
       <span id="match-status-text">Click an empty chair at a table to sit</span>
@@ -91,7 +116,7 @@
       <button id="btn-stand-up" class="btn btn-danger" style="display:none;" onclick="standUp()">Leave Table</button>
     </div>
 
-    <!-- Ask Modal -->
+    <!-- Ask Question Modal -->
     <div id="modal-ask" class="game-modal">
       <h2>Your Turn: Ask! <span>❓</span></h2>
       <div class="modal-subtitle">Opponent steals 30 coins if right; you steal 30 if wrong!</div>
@@ -106,7 +131,7 @@
       <button class="btn btn-accent" style="width:100%; justify-content:center;" onclick="submitPlayerQuestion()">Send Question</button>
     </div>
 
-    <!-- Answer Modal -->
+    <!-- Answer Question Modal -->
     <div id="modal-answer" class="game-modal">
       <div class="timer-bar"><div id="answer-timer" class="timer-progress"></div></div>
       <h2>Answer the Duel! <span>⏳</span></h2>
@@ -119,7 +144,43 @@
     </div>
   </div>
 
-  <div id="toast">Connecting to server...</div>
+  <div id="toast">Connecting...</div>
+
+  <!-- DEVICE-BASED CHARACTER CREATOR (Shown on first visit only) -->
+  <div id="character-modal" class="overlay-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="char-modal-title" style="color:var(--accent);">🎨 Customize Your Roblox Noob</h2>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-muted); margin-bottom: 14px; font-size: 0.85rem;">
+          Your character will automatically be saved to this device ID in the database. No email or password needed!
+        </p>
+
+        <form id="char-form" onsubmit="handleSaveCharacter(event)">
+          <div class="input-group">
+            <label>Character Name</label>
+            <input type="text" id="char-username" required maxlength="15" placeholder="e.g. MegaNoob99">
+          </div>
+
+          <div style="display: flex; gap: 12px;">
+            <div class="input-group" style="flex:1;">
+              <label>Torso Color</label>
+              <input type="color" id="char-torso-color" value="#0055bf">
+            </div>
+            <div class="input-group" style="flex:1;">
+              <label>Head / Skin Color</label>
+              <input type="color" id="char-head-color" value="#ffe800">
+            </div>
+          </div>
+
+          <button type="submit" id="btn-save-char" class="btn btn-accent" style="width:100%; justify-content:center; padding: 12px; margin-top: 10px;">
+            Enter Arena
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
 
   <!-- Rules Modal -->
   <div id="rules-modal" class="overlay-modal">
@@ -188,24 +249,26 @@
 
   <script>
     /* ==========================================================
-       1. GAME STATE & AUDIO SYNTHESIZER
+       1. GLOBAL CHARACTER & DEVICE STATE
        ========================================================== */
-    let coins = parseInt(localStorage.getItem('roblox_noob_coins') || '0', 10);
-    let firstGameDone = localStorage.getItem('roblox_noob_first_win_done') === 'true';
-    let equipped = JSON.parse(localStorage.getItem('roblox_noob_equipped') || '{"hat":"hat_none"}');
+    let deviceId = null;
+    let coins = 0;
+    let firstGameDone = false;
+    let equipped = { hat: 'hat_none' };
+    let myPlayerName = "Noob";
+    let myTorsoColor = "#0055bf";
+    let myHeadColor = "#ffe800";
 
-    let myPlayerId = 'p_' + Math.random().toString(36).substring(2, 7);
-    let myPlayerName = "Noob_" + myPlayerId.substring(2);
     let seatedTableId = null;
     let seatedSeatIdx = null;
 
-    // Cache latest table state
     let cachedTables = [
       { id: 1, seats: [null, null], waitSeconds: 60 },
       { id: 2, seats: [null, null], waitSeconds: 60 },
       { id: 3, seats: [null, null], waitSeconds: 60 }
     ];
 
+    // Web Audio Sound Synthesizer (Zero asset dependency)
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playBeep(type = 'blip') {
       try {
@@ -247,7 +310,89 @@
     }
 
     /* ==========================================================
-       2. PHASER 3 ENGINE (Direct Interactive Seat Handling)
+       2. DEVICE-BASED AUTH & DATABASE LIFECYCLE
+       ========================================================== */
+    window.addEventListener('DOMContentLoaded', async () => {
+      deviceId = DB.getDeviceId();
+      showToast("Recognizing device...");
+
+      try {
+        const profile = await DB.getDeviceProfile();
+        if (profile) {
+          applyProfile(profile);
+          showToast(`Welcome back, ${profile.username}!`);
+        } else {
+          document.getElementById('character-modal').style.display = 'flex';
+        }
+      } catch (err) {
+        console.warn("DB check error, using defaults:", err);
+        document.getElementById('character-modal').style.display = 'flex';
+      }
+    });
+
+    function applyProfile(profile) {
+      myPlayerName = profile.username;
+      coins = profile.coins || 0;
+      firstGameDone = !!profile.first_game_done;
+      equipped.hat = profile.hat || 'hat_none';
+      myTorsoColor = profile.torso_color || '#0055bf';
+      myHeadColor = profile.head_color || '#ffe800';
+
+      document.getElementById('hud-player-name').innerText = `${myPlayerName}'s Arena`;
+      document.getElementById('char-username').value = myPlayerName;
+      document.getElementById('char-torso-color').value = myTorsoColor;
+      document.getElementById('char-head-color').value = myHeadColor;
+      updateHud();
+
+      if (isConnected && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'SYNC_PROFILE',
+          coins: coins,
+          hat: equipped.hat,
+          torsoColor: myTorsoColor,
+          headColor: myHeadColor,
+          firstGameDone: firstGameDone,
+          name: myPlayerName
+        }));
+      }
+    }
+
+    async function handleSaveCharacter(e) {
+      e.preventDefault();
+      const username = document.getElementById('char-username').value.trim() || 'Noob_' + Math.floor(Math.random() * 1000);
+      const torsoColor = document.getElementById('char-torso-color').value;
+      const headColor = document.getElementById('char-head-color').value;
+      const btn = document.getElementById('btn-save-char');
+      btn.disabled = true;
+
+      try {
+        const existing = await DB.getDeviceProfile();
+        let profile;
+
+        if (!existing) {
+          profile = await DB.registerDeviceProfile({ username, torsoColor, headColor, hat: 'hat_none' });
+          showToast(`Character "${username}" registered on this device!`);
+        } else {
+          profile = await DB.updateAttributes({ username, torso_color: torsoColor, head_color: headColor });
+          showToast("Character updated!");
+        }
+
+        applyProfile(profile);
+        document.getElementById('character-modal').style.display = 'none';
+      } catch (err) {
+        alert("Save failed: " + err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function openCustomizerModal() {
+      document.getElementById('char-modal-title').innerText = "🎨 Edit Your Roblox Noob";
+      document.getElementById('character-modal').style.display = 'flex';
+    }
+
+    /* ==========================================================
+       3. PHASER 3 ENGINE (Direct Interactive Seats & Roblox Sprites)
        ========================================================== */
     let phaserScene = null;
 
@@ -268,7 +413,7 @@
           this.clouds.push(this.add.rectangle(Phaser.Math.Between(0, w), Phaser.Math.Between(30, h * 0.3), 110, 35, 0xffffff, 0.85));
         }
 
-        // Grass & Stud Grid
+        // Grassy Field & Studs
         this.add.rectangle(w / 2, h * 0.725, w, h * 0.55, 0x43a047);
         this.add.grid(w / 2, h * 0.725, w, h * 0.55, 45, 45, null, null, 0x000000, 0.08);
 
@@ -281,7 +426,6 @@
           const ty = h * 0.65;
           const tableId = i + 1;
 
-          // Table visual
           this.add.ellipse(tx, ty + 20, 110, 30, 0x000000, 0.2);
           this.add.rectangle(tx - 30, ty + 15, 8, 25, 0x3a200a);
           this.add.rectangle(tx + 30, ty + 15, 8, 25, 0x3a200a);
@@ -295,21 +439,16 @@
             const cx = tx + chairOffsets[seatIdx];
             const cy = ty - 10;
 
-            // Chair graphics
-            const stool = this.add.rectangle(cx, cy + 10, 30, 22, 0x5c3a21);
-            const back = this.add.rectangle(cx, cy - 10, 30, 20, 0x5c3a21);
+            this.add.rectangle(cx, cy + 10, 30, 22, 0x5c3a21);
+            this.add.rectangle(cx, cy - 10, 30, 20, 0x5c3a21);
             const promptText = this.add.text(cx, cy - 28, 'CLICK TO SIT', { fontSize: '9px', fontStyle: 'bold', color: '#ffcc00' }).setOrigin(0.5);
 
-            // Top-level direct interactive zone
-            const hitRect = this.add.rectangle(cx, cy, 54, 70, 0xffffff, 0.001)
-              .setInteractive({ cursor: 'pointer' });
-
+            // Direct Top-Level Interactive Hit Area
+            const hitRect = this.add.rectangle(cx, cy, 54, 70, 0xffffff, 0.001).setInteractive({ cursor: 'pointer' });
             hitRect.on('pointerover', () => promptText.setScale(1.2));
             hitRect.on('pointerout', () => promptText.setScale(1.0));
             hitRect.on('pointerdown', () => {
-              if (seatedTableId === null) {
-                sitDown(tableId, seatIdx);
-              }
+              if (seatedTableId === null) sitDown(tableId, seatIdx);
             });
 
             chairs.push({ cx, cy, promptText, hitRect, avatarContainer: null });
@@ -318,7 +457,7 @@
           this.tableDisplayData.push({ id: tableId, chairs });
         }
 
-        // Global pointer fallback to ensure click detection on mobile/touch
+        // Global fallback to ensure touch devices trigger click reliably
         this.input.on('pointerdown', (pointer) => {
           if (seatedTableId !== null) return;
           this.tableDisplayData.forEach(t => {
@@ -330,7 +469,6 @@
           });
         });
 
-        // Apply any state that arrived before Phaser finished loading
         this.syncWithState(cachedTables);
       }
 
@@ -343,7 +481,6 @@
 
       syncWithState(tables) {
         if (!this.tableDisplayData) return;
-
         tables.forEach((tData, tIdx) => {
           const tDisplay = this.tableDisplayData[tIdx];
           if (!tDisplay) return;
@@ -370,13 +507,16 @@
       createNoobContainer(x, y, playerData) {
         const noob = this.add.container(x, y);
 
+        const torsoHex = parseInt((playerData.torsoColor || myTorsoColor).replace('#', '0x'), 16);
+        const headHex = parseInt((playerData.headColor || myHeadColor).replace('#', '0x'), 16);
+
         const shadow = this.add.ellipse(0, 25, 30, 10, 0x000000, 0.25);
         const leftLeg = this.add.rectangle(-6, 12, 10, 18, 0x00a651);
         const rightLeg = this.add.rectangle(6, 12, 10, 18, 0x00a651);
-        const torso = this.add.rectangle(0, -4, 26, 20, 0x0055bf);
-        const leftArm = this.add.rectangle(-17, -4, 8, 18, 0xffe800);
-        const rightArm = this.add.rectangle(17, -4, 8, 18, 0xffe800);
-        const head = this.add.rectangle(0, -19, 18, 16, 0xffe800);
+        const torso = this.add.rectangle(0, -4, 26, 20, torsoHex);
+        const leftArm = this.add.rectangle(-17, -4, 8, 18, headHex);
+        const rightArm = this.add.rectangle(17, -4, 8, 18, headHex);
+        const head = this.add.rectangle(0, -19, 18, 16, headHex);
         const leftEye = this.add.rectangle(-4, -21, 2, 3, 0x000000);
         const rightEye = this.add.rectangle(4, -21, 2, 3, 0x000000);
         const smile = this.add.arc(0, -16, 4, 20, 160, false, 0x000000);
@@ -396,6 +536,7 @@
           noob.add(this.add.rectangle(0, -29, 20, 6, 0xffd700));
         }
 
+        // Bobbing animation
         this.tweens.add({
           targets: noob,
           y: '-=3',
@@ -429,22 +570,17 @@
     }
 
     const containerEl = document.getElementById('game-container');
-    const config = {
+    const phaserGame = new Phaser.Game({
       type: Phaser.AUTO,
       parent: 'game-container',
       width: containerEl.clientWidth || window.innerWidth,
       height: containerEl.clientHeight || (window.innerHeight - 60),
-      transparent: false,
       scene: [ArenaScene],
-      scale: {
-        mode: Phaser.Scale.RESIZE,
-        autoCenter: Phaser.Scale.CENTER_BOTH
-      }
-    };
-    const phaserGame = new Phaser.Game(config);
+      scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH }
+    });
 
     /* ==========================================================
-       3. WEBSOCKET NETWORKING & MATCHMAKING
+       4. WEBSOCKET SYNC & MATCHMAKING
        ========================================================== */
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     let ws = null;
@@ -461,7 +597,10 @@
             type: 'SYNC_PROFILE',
             coins: coins,
             hat: equipped.hat,
-            firstGameDone: firstGameDone
+            torsoColor: myTorsoColor,
+            headColor: myHeadColor,
+            firstGameDone: firstGameDone,
+            name: myPlayerName
           }));
         };
 
@@ -469,29 +608,19 @@
           const data = JSON.parse(event.data);
           handleServerPacket(data);
         };
-
-        ws.onerror = () => { fallbackToOffline(); };
         ws.onclose = () => { isConnected = false; };
       } catch (e) {
-        fallbackToOffline();
+        isConnected = false;
       }
     }
-
-    function fallbackToOffline() {
-      isConnected = false;
-      showToast("Playing in Offline/Local Mode with Computer!");
-    }
-
     initSocket();
 
     function handleServerPacket(data) {
       switch (data.type) {
         case 'INIT_STATE':
-          myPlayerId = data.playerId;
-          myPlayerName = data.name;
+          updateServerBadge(data.serverPlayerCount, data.maxPlayers);
           cachedTables = data.tables;
           if (phaserScene) phaserScene.syncWithState(data.tables);
-          updateServerBadge(data.serverPlayerCount, data.maxPlayers);
           break;
         case 'SERVER_INFO':
           updateServerBadge(data.count, 13);
@@ -502,7 +631,6 @@
           cachedTables = data.tables;
           if (phaserScene) phaserScene.syncWithState(data.tables);
 
-          // Update lobby HUD timer
           if (seatedTableId !== null) {
             const tbl = data.tables.find(t => t.id === seatedTableId);
             if (tbl) {
@@ -524,9 +652,9 @@
           break;
         case 'FIRST_WIN_COMPLETED':
           firstGameDone = true;
-          localStorage.setItem('roblox_noob_first_win_done', 'true');
           coins += data.bonus;
           updateHud();
+          DB.updateAttributes({ coins: coins, first_game_done: true });
           playBeep('win');
           showToast(data.message);
           standUp();
@@ -556,6 +684,7 @@
             if (phaserScene) phaserScene.spawnCoinFloat(window.innerWidth / 2, window.innerHeight * 0.5, `-${data.stolen} COINS!`, '#ff4757');
           }
           updateHud();
+          DB.updateAttributes({ coins: coins });
           break;
         case 'MATCH_OVER':
           showToast(data.message);
@@ -564,6 +693,7 @@
         case 'REPORT_SUCCESS':
           coins += data.bounty;
           updateHud();
+          DB.updateAttributes({ coins: coins });
           playBeep('win');
           showToast(data.message);
           break;
@@ -571,9 +701,6 @@
           showToast(data.message);
           document.getElementById('match-status-text').innerText = "Opponent left. Waiting for another player...";
           document.getElementById('btn-force-bot').style.display = 'inline-flex';
-          break;
-        case 'ACTION_FAILED':
-          showToast(data.message);
           break;
       }
     }
@@ -592,8 +719,12 @@
           seatIdx: seatIdx
         }));
       } else {
-        // Instant local/offline fallback match with Computer
-        startLocalComputerMatch(tableId, seatIdx);
+        const botSeatIdx = seatIdx === 0 ? 1 : 0;
+        cachedTables[tableId - 1].seats[seatIdx] = { id: deviceId, name: myPlayerName, coins, hat: equipped.hat, torsoColor: myTorsoColor, headColor: myHeadColor };
+        cachedTables[tableId - 1].seats[botSeatIdx] = { id: 'bot_local', name: 'Computer_Bot', coins: 60, hat: 'hat_cap' };
+        if (phaserScene) phaserScene.syncWithState(cachedTables);
+        document.getElementById('match-status-text').innerText = "Dueling Computer_Bot!";
+        setTimeout(() => openAskModal(), 1000);
       }
     }
 
@@ -601,30 +732,12 @@
       if (isConnected && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'FORCE_COMPUTER_OPPONENT' }));
         document.getElementById('btn-force-bot').style.display = 'none';
-      } else {
-        startLocalComputerMatch(seatedTableId, seatedSeatIdx);
       }
-    }
-
-    function startLocalComputerMatch(tableId, seatIdx) {
-      document.getElementById('btn-force-bot').style.display = 'none';
-      const botSeatIdx = seatIdx === 0 ? 1 : 0;
-      cachedTables[tableId - 1].seats[seatIdx] = { id: myPlayerId, name: myPlayerName, coins, hat: equipped.hat };
-      cachedTables[tableId - 1].seats[botSeatIdx] = { id: 'bot_local', name: 'Computer_Bot', coins: 60, hat: 'hat_cap' };
-      if (phaserScene) phaserScene.syncWithState(cachedTables);
-
-      document.getElementById('match-status-text').innerText = "Dueling Computer_Bot!";
-      showToast("Computer opponent joined!");
-      setTimeout(() => openAskModal(), 1000);
     }
 
     function standUp() {
       if (seatedTableId !== null && isConnected && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'STAND_UP' }));
-      }
-      if (seatedTableId !== null) {
-        cachedTables[seatedTableId - 1].seats = [null, null];
-        if (phaserScene) phaserScene.syncWithState(cachedTables);
       }
       seatedTableId = null;
       seatedSeatIdx = null;
@@ -637,8 +750,8 @@
     }
 
     /* ==========================================================
-       4. DUEL DIALOGS & ACTIONS
-       ========================================================== */
+       5. DUEL DIALOGS & HUD
+       ========================================================= */
     function openAskModal() {
       document.getElementById('ask-question-input').value = '';
       document.getElementById('ask-answer-input').value = '';
@@ -649,36 +762,13 @@
       const q = document.getElementById('ask-question-input').value.trim();
       const a = document.getElementById('ask-answer-input').value.trim();
       if (!q || !a) {
-        showToast("Please enter both question and secret answer!");
+        showToast("Enter both question and secret answer!");
         return;
       }
       closeModal('modal-ask');
-
       if (isConnected && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'SUBMIT_QUESTION', question: q, answer: a }));
         showToast("Question sent to opponent!");
-      } else {
-        // Local AI resolution
-        showToast("Question sent to Computer!");
-        setTimeout(() => {
-          const aiCorrect = !firstGameDone ? false : Math.random() < 0.35;
-          if (aiCorrect) {
-            coins = Math.max(0, coins - 30);
-            playBeep('oof');
-            showToast("Computer answered correctly! Stole 30 coins from you!");
-          } else {
-            coins += 30;
-            playBeep('coin');
-            showToast("Computer answered wrong! You stole 30 coins!");
-            if (!firstGameDone) {
-              firstGameDone = true;
-              localStorage.setItem('roblox_noob_first_win_done', 'true');
-              coins += 100;
-              showToast("🎉 FIRST WIN BONUS: +100 Coins Awarded!");
-            }
-          }
-          updateHud();
-        }, 1500);
       }
     }
 
@@ -705,7 +795,6 @@
       clearInterval(window.ansTimerInterval);
       const userAns = document.getElementById('player-answer-input').value.trim();
       closeModal('modal-answer');
-
       if (isConnected && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'SUBMIT_ANSWER', answer: userAns }));
       }
@@ -713,13 +802,10 @@
 
     function updateHud() {
       document.getElementById('player-coins').innerText = coins;
-      localStorage.setItem('roblox_noob_coins', coins);
     }
-
     function updateServerBadge(count, max) {
       document.getElementById('server-capacity-badge').innerText = `Server Capacity: ${count} / ${max} Players`;
     }
-
     function showToast(msg) {
       const toast = document.getElementById('toast');
       toast.innerText = msg;
@@ -738,14 +824,8 @@
       if (!target) return;
       closeReportModal();
       document.getElementById('report-user-input').value = '';
-
       if (isConnected && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'REPORT_VIOLATOR', targetName: target }));
-      } else {
-        coins += 10;
-        updateHud();
-        playBeep('win');
-        showToast(`Report filed for "${target}". Banned! Claimed +10 coins bounty!`);
       }
     }
 
@@ -769,23 +849,21 @@
     }
     function closeShop() { document.getElementById('shop-modal').style.display = 'none'; }
 
-    function buyItem(id, price) {
+    async function buyItem(id, price) {
       if (coins < price) {
         showToast("Not enough coins!");
         return;
       }
       coins -= price;
       equipped.hat = id;
-      localStorage.setItem('roblox_noob_equipped', JSON.stringify(equipped));
       updateHud();
+      await DB.updateAttributes({ coins: coins, hat: id });
       if (isConnected && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'SYNC_PROFILE', coins, hat: id, firstGameDone }));
+        ws.send(JSON.stringify({ type: 'SYNC_PROFILE', coins, hat: id, firstGameDone, torsoColor: myTorsoColor, headColor: myHeadColor }));
       }
-      showToast("Item equipped!");
+      showToast("Item equipped & saved to database!");
       closeShop();
     }
-
-    updateHud();
   </script>
 </body>
 </html>

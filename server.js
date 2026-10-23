@@ -1,3 +1,4 @@
+require('dotenv').config(); // Load environment variables from .env
 const http = require('http');
 const path = require('path');
 const express = require('express');
@@ -8,10 +9,21 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 const PORT = process.env.PORT || 3000;
-const MAX_SERVER_PLAYERS = 13; // Rule 5: Server capacity 13
-const MAX_COIN_STEAL = 30;     // Rule 2: Max coins you can take is 30
+const MAX_SERVER_PLAYERS = 13;
+const MAX_COIN_STEAL = 30;
 
-// Serve index.html statically
+// Dynamic config route to supply public keys to frontend
+app.get('/config.js', (req, res) => {
+  res.type('application/javascript');
+  res.send(`
+    window.ENV = {
+      SUPABASE_URL: "${process.env.SUPABASE_URL || ''}",
+      SUPABASE_ANON_KEY: "${process.env.SUPABASE_ANON_KEY || ''}"
+    };
+  `);
+});
+
+// Serve static frontend files
 app.use(express.static(__dirname));
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -174,7 +186,6 @@ function handleMessage(player, data) {
         isBot: false
       };
 
-      // Guaranteed win tutorial for brand new players
       if (!player.firstGameDone) {
         const otherIdx = seatIdx === 0 ? 1 : 0;
         const tutorialBot = {
@@ -210,7 +221,6 @@ function handleMessage(player, data) {
         }
         startDuel(table, table.seats[0], table.seats[1]);
       } else {
-        // Wait 60s for human, or user can click "Play with Computer Now"
         table.waitSeconds = 60;
         broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
 
@@ -231,7 +241,6 @@ function handleMessage(player, data) {
       break;
     }
 
-    // Instant Computer Opponent trigger
     case 'FORCE_COMPUTER_OPPONENT': {
       const table = tables.find(t => t.id === player.tableId);
       if (!table) return;
@@ -294,7 +303,7 @@ function handleMessage(player, data) {
 
     case 'REPORT_VIOLATOR': {
       const targetName = (data.targetName || '').trim();
-      player.coins += 10; // Rule 5: 10 coins bounty
+      player.coins += 10;
       sendToPlayer(player.id, {
         type: 'REPORT_SUCCESS',
         bounty: 10,
