@@ -6,7 +6,6 @@
   <title>Roblox Noob Q&amp;A Arena</title>
   <meta name="theme-color" content="#101216">
 
-  <!-- Pre-initialize logging so zero logs are ever lost -->
   <script>
     window.DB_LOGS = [];
     window.logDB = function(level, msg) {
@@ -19,10 +18,10 @@
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <!-- 2. Supabase Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- 3. Dynamic Environment Config from server.js -->
+  <!-- 3. Dynamic Environment Config -->
   <script src="/config.js" onerror="window.logDB('WARN', '/config.js could not be loaded; using default credentials.')"></script>
   <!-- 4. Database & Diagnostics File -->
-  <script src="supabase.js" onerror="window.logDB('ERROR', 'Failed to load supabase.js! Verify the file is in the project root.')"></script>
+  <script src="supabase.js" onerror="window.logDB('ERROR', 'Failed to load supabase.js!')"></script>
 
   <style>
     :root {
@@ -43,9 +42,11 @@
     .brand { display: flex; align-items: center; gap: 10px; }
     .brand-icon { width: 32px; height: 32px; background: #ffe800; border: 2px solid #000; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 900; color: #000; box-shadow: 2px 2px 0px #000; }
     .brand h1 { font-size: 1.1rem; font-weight: 800; }
-    .stats-bar { display: flex; align-items: center; gap: 10px; }
+    .stats-bar { display: flex; align-items: center; gap: 8px; }
     .badge { display: flex; align-items: center; gap: 6px; background: #242933; padding: 6px 12px; border-radius: 20px; border: 1px solid var(--card-border); font-size: 0.85rem; font-weight: 600; cursor: default; }
     .coin-badge { color: var(--accent); border-color: rgba(255, 204, 0, 0.3); }
+    .level-badge { color: #a29bfe; border-color: rgba(162, 155, 254, 0.3); }
+    .name-badge { color: #55efc4; border-color: rgba(85, 239, 196, 0.3); }
 
     /* Live DB Status Pill */
     #db-status-badge { cursor: pointer; transition: all 0.2s; }
@@ -60,6 +61,7 @@
     .btn-accent { background: var(--accent); color: #000; border-color: #caa000; }
     .btn-danger { background: var(--danger); color: #fff; border: none; }
     .btn-bot { background: #8e44ad; color: #fff; border: none; }
+    .btn-gold { background: linear-gradient(135deg, #f1c40f, #e67e22); color: #000; border: none; }
 
     #game-container { position: relative; flex: 1; overflow: hidden; width: 100%; height: 100%; }
     #lobby-controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(20, 24, 33, 0.92); backdrop-filter: blur(8px); padding: 10px 18px; border-radius: 30px; border: 1px solid var(--card-border); display: flex; align-items: center; gap: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 5; }
@@ -79,6 +81,17 @@
     .modal-content { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; width: 100%; max-width: 540px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
     .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; }
     .modal-body { padding: 20px; overflow-y: auto; font-size: 0.9rem; line-height: 1.5; }
+
+    /* Leaderboard Styling */
+    .leaderboard-table { width: 100%; border-collapse: collapse; text-align: left; }
+    .leaderboard-table th { padding: 10px 8px; border-bottom: 2px solid var(--card-border); color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; }
+    .leaderboard-table td { padding: 10px 8px; border-bottom: 1px solid #232733; font-size: 0.88rem; vertical-align: middle; }
+    .rank-cell { font-weight: 800; width: 35px; }
+    .rank-1 { color: #f1c40f; }
+    .rank-2 { color: #bdc3c7; }
+    .rank-3 { color: #e67e22; }
+    .mini-noob-badge { display: inline-flex; align-items: center; gap: 8px; }
+    .mini-avatar-dot { width: 14px; height: 14px; border-radius: 3px; display: inline-block; border: 1px solid #000; }
 
     /* Diagnostic Console Output */
     #log-terminal { background: #0b0c10; border: 1px solid #1f232b; border-radius: 8px; padding: 12px; font-family: 'Courier New', Courier, monospace; font-size: 0.8rem; height: 260px; overflow-y: auto; color: #c5c6c7; display: flex; flex-direction: column; gap: 5px; user-select: text; }
@@ -100,33 +113,49 @@
 </head>
 <body>
 
+  <!-- Top Dark Header HUD -->
   <header>
     <div class="brand">
       <div class="brand-icon">OOF</div>
       <div>
-        <h1 id="hud-player-name">Noob Q&amp;A Arena</h1>
-        <small id="server-capacity-badge" style="color:var(--text-muted); font-size:0.72rem;">Server Capacity: 1 / 13 Players</small>
+        <!-- Change 1: Fixed Arena Title -->
+        <h1 id="hud-game-title">Roblox Noob Q&amp;A Arena</h1>
+        <!-- Change 4: Server Capacity 8 -->
+        <small id="server-capacity-badge" style="color:var(--text-muted); font-size:0.72rem;">Server Capacity: 1 / 8 Players</small>
       </div>
     </div>
     
     <div class="stats-bar">
-      <!-- Live DB Health Badge -->
-      <div id="db-status-badge" class="badge db-warn" onclick="openDiagnosticModal()" title="Click to view Database Diagnostics">
-        <span id="db-status-icon">🟡</span>
-        <span id="db-status-text">DB: Checking...</span>
+      <!-- Change 1 & 3: Character Name and Level Badge in Header -->
+      <div class="badge name-badge" title="Your Character Name">
+        <span>👤</span>
+        <span id="player-display-name">Noob</span>
       </div>
-
+      <div class="badge level-badge" title="Level = floor(Coins / 50) + 1">
+        <span>⭐</span>
+        <span id="player-level-display">Lv. 1</span>
+      </div>
       <div class="badge coin-badge">
         <span>💰</span>
         <span id="player-coins">0</span> Coins
       </div>
+
+      <!-- Change 2: Leaderboard Button -->
+      <button class="btn btn-gold" onclick="openLeaderboardModal()">🏆 Leaderboard</button>
       <button class="btn" onclick="openCustomizerModal()">🎨 Edit Noob</button>
       <button class="btn" onclick="openShop()">🛒 Shop</button>
       <button class="btn" onclick="openRules()">📜 Rules</button>
       <button class="btn btn-danger" onclick="openReportModal()">🚨 Report</button>
+
+      <!-- Live DB Health Badge -->
+      <div id="db-status-badge" class="badge db-warn" onclick="openDiagnosticModal()" title="Database Health Diagnostics">
+        <span id="db-status-icon">🟡</span>
+        <span id="db-status-text">DB: Checking...</span>
+      </div>
     </div>
   </header>
 
+  <!-- Phaser Game Container -->
   <div id="game-container">
     <div id="lobby-controls">
       <span id="match-status-text">Click an empty chair at a table to sit</span>
@@ -164,9 +193,36 @@
 
   <div id="toast">Connecting...</div>
 
+  <!-- Change 2: LEADERBOARD MODAL -->
+  <div id="leaderboard-modal" class="overlay-modal">
+    <div class="modal-content" style="max-width: 580px;">
+      <div class="modal-header">
+        <h2 style="color:var(--accent);">🏆 Registered Players Leaderboard</h2>
+        <button class="btn" onclick="closeLeaderboardModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <table class="leaderboard-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Player</th>
+              <th>Level</th>
+              <th>Coins</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-tbody">
+            <tr>
+              <td colspan="4" style="text-align:center; color:var(--text-muted); padding:20px;">Loading registered players...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- DIAGNOSTIC / DATABASE LOG MODAL -->
   <div id="diagnostic-modal" class="overlay-modal">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 600px;">
       <div class="modal-header">
         <h2 style="color:var(--accent);">🛠️ Database Diagnostics &amp; Logs</h2>
         <button class="btn" onclick="closeDiagnosticModal()">✕</button>
@@ -191,15 +247,16 @@
     </div>
   </div>
 
-  <!-- Character Creator Modal -->
+  <!-- Character Creator / Customizer Modal -->
   <div id="character-modal" class="overlay-modal">
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="char-modal-title" style="color:var(--accent);">🎨 Customize Your Roblox Noob</h2>
+        <button class="btn" onclick="closeCustomizerModal()">✕</button>
       </div>
       <div class="modal-body">
         <p style="color:var(--text-muted); margin-bottom: 14px; font-size: 0.85rem;">
-          Your character will automatically be saved to this device ID in the database.
+          Your custom character name, level, and colors will be saved in the database.
         </p>
         <form id="char-form" onsubmit="handleSaveCharacter(event)">
           <div class="input-group">
@@ -217,14 +274,14 @@
             </div>
           </div>
           <button type="submit" id="btn-save-char" class="btn btn-accent" style="width:100%; justify-content:center; padding: 12px; margin-top: 10px;">
-            Enter Arena
+            Save Character
           </button>
         </form>
       </div>
     </div>
   </div>
 
-  <!-- Rules Modal -->
+  <!-- Rules Modal (Updated with 4 tables / 8 max players) -->
   <div id="rules-modal" class="overlay-modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -235,11 +292,11 @@
         <div class="rule-section">
           <h3>Normal Rules</h3>
           <ol>
-            <li><strong>6 people max in 1 game.</strong> (3 tables with 2 chairs each).</li>
+            <li><strong>8 people max in 1 game.</strong> (4 tables with 2 chairs each).</li>
             <li><strong>The max coins you can take is 30.</strong> (Or all remaining coins if under 30).</li>
             <li><strong>NO BOTS!</strong> Any bot that joins will be banned.</li>
             <li><strong>No: Glitching, exploiting, hacking or cheating.</strong></li>
-            <li><strong>The max people in the server is 13.</strong></li>
+            <li><strong>The max people in the server is 8.</strong></li>
           </ol>
         </div>
         <div class="rule-section" style="border-left-color: #00a651;">
@@ -304,11 +361,19 @@
     let seatedTableId = null;
     let seatedSeatIdx = null;
 
+    // Change 4: 4 tables cached state
     let cachedTables = [
       { id: 1, seats: [null, null], waitSeconds: 60 },
       { id: 2, seats: [null, null], waitSeconds: 60 },
-      { id: 3, seats: [null, null], waitSeconds: 60 }
+      { id: 3, seats: [null, null], waitSeconds: 60 },
+      { id: 4, seats: [null, null], waitSeconds: 60 }
     ];
+
+    // Change 3: Level Formula (Level 1: 0-49 coins, Level 2: 50-99 coins, etc.)
+    function calculateLevel(coinCount) {
+      const c = Math.max(0, parseInt(coinCount) || 0);
+      return Math.floor(c / 50) + 1;
+    }
 
     // Real-Time Log Listener
     window.onNewDBLog = (entry) => {
@@ -436,19 +501,25 @@
       } catch (e) {}
     }
 
+    // Change 1 & 3: Character name and level applied cleanly
     function applyProfile(profile) {
-      myPlayerName = profile.username;
-      coins = profile.coins || 0;
+      myPlayerName = profile.username || myPlayerName;
+      coins = profile.coins !== undefined ? profile.coins : coins;
       firstGameDone = !!profile.first_game_done;
       equipped.hat = profile.hat || 'hat_none';
       myTorsoColor = profile.torso_color || '#0055bf';
       myHeadColor = profile.head_color || '#ffe800';
 
-      document.getElementById('hud-player-name').innerText = `${myPlayerName}'s Arena`;
+      document.getElementById('player-display-name').innerText = myPlayerName;
       document.getElementById('char-username').value = myPlayerName;
       document.getElementById('char-torso-color').value = myTorsoColor;
       document.getElementById('char-head-color').value = myHeadColor;
       updateHud();
+
+      // Refresh Phaser canvas if already seated
+      if (phaserScene) {
+        phaserScene.syncWithState(cachedTables);
+      }
 
       if (isConnected && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
@@ -472,7 +543,7 @@
       btn.disabled = true;
 
       try {
-        if (!window.DB) throw new Error("Database helper (window.DB) is not available.");
+        if (!window.DB) throw new Error("Database helper is not loaded.");
         const existing = await window.DB.getDeviceProfile();
         let profile;
         if (!existing) {
@@ -480,12 +551,11 @@
           showToast(`Character "${username}" registered!`);
         } else {
           profile = await window.DB.updateAttributes({ username, torso_color: torsoColor, head_color: headColor });
-          showToast("Character updated!");
+          showToast(`Character updated to "${username}"!`);
         }
         applyProfile(profile || { username, torso_color: torsoColor, head_color: headColor, coins, hat: equipped.hat });
         document.getElementById('character-modal').style.display = 'none';
       } catch (err) {
-        // Fallback gracefully so player is not blocked
         window.logDB('ERROR', `Character save error: ${err.message}`);
         applyProfile({ username, torso_color: torsoColor, head_color: headColor, coins, hat: equipped.hat });
         document.getElementById('character-modal').style.display = 'none';
@@ -499,9 +569,71 @@
       document.getElementById('char-modal-title').innerText = "🎨 Edit Your Roblox Noob";
       document.getElementById('character-modal').style.display = 'flex';
     }
+    function closeCustomizerModal() {
+      document.getElementById('character-modal').style.display = 'none';
+    }
+
+    // Change 2: Leaderboard modal fetch & display
+    async function openLeaderboardModal() {
+      const modal = document.getElementById('leaderboard-modal');
+      const tbody = document.getElementById('leaderboard-tbody');
+      modal.style.display = 'flex';
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:20px;">Fetching rankings from database...</td></tr>';
+
+      if (!window.DB || typeof window.DB.getLeaderboard !== 'function') {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--danger); padding:20px;">Database helper offline.</td></tr>';
+        return;
+      }
+
+      const playersList = await window.DB.getLeaderboard(20);
+
+      if (!playersList || playersList.length === 0) {
+        // Fallback display if database has only current player or is empty
+        tbody.innerHTML = `
+          <tr>
+            <td class="rank-cell rank-1">#1</td>
+            <td>
+              <div class="mini-noob-badge">
+                <span class="mini-avatar-dot" style="background:${myTorsoColor};"></span>
+                <strong>${myPlayerName}</strong> (You)
+              </div>
+            </td>
+            <td><span style="color:#a29bfe; font-weight:bold;">Lv. ${calculateLevel(coins)}</span></td>
+            <td><strong style="color:var(--accent);">💰 ${coins}</strong></td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      playersList.forEach((p, idx) => {
+        const rank = idx + 1;
+        const rankClass = rank === 1 ? 'rank-1' : (rank === 2 ? 'rank-2' : (rank === 3 ? 'rank-3' : ''));
+        const level = calculateLevel(p.coins);
+        const isMe = p.username === myPlayerName;
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="rank-cell ${rankClass}">#${rank}</td>
+          <td>
+            <div class="mini-noob-badge">
+              <span class="mini-avatar-dot" style="background:${p.torso_color || '#0055bf'};"></span>
+              <strong>${p.username}</strong> ${isMe ? '<small style="color:var(--accent);">(You)</small>' : ''}
+            </div>
+          </td>
+          <td><span style="color:#a29bfe; font-weight:bold;">Lv. ${level}</span></td>
+          <td><strong style="color:var(--accent);">💰 ${p.coins || 0}</strong></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function closeLeaderboardModal() {
+      document.getElementById('leaderboard-modal').style.display = 'none';
+    }
 
     /* ==========================================================
-       3. PHASER 3 ENGINE
+       3. PHASER 3 ENGINE (4 Tables Layout & Level Displays)
        ========================================================== */
     let phaserScene = null;
 
@@ -515,39 +647,40 @@
 
         this.add.rectangle(w / 2, h * 0.225, w, h * 0.45, 0x1da1f2);
         this.clouds = [];
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 5; i++) {
           this.clouds.push(this.add.rectangle(Phaser.Math.Between(0, w), Phaser.Math.Between(30, h * 0.3), 110, 35, 0xffffff, 0.85));
         }
 
         this.add.rectangle(w / 2, h * 0.725, w, h * 0.55, 0x43a047);
         this.add.grid(w / 2, h * 0.725, w, h * 0.55, 45, 45, null, null, 0x000000, 0.08);
 
+        // Change 4: 4 Tables spread evenly across screen
         this.tableDisplayData = [];
-        const tablePositions = [0.22, 0.50, 0.78];
+        const tablePositions = [0.14, 0.38, 0.62, 0.86];
 
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 4; i++) {
           const tx = w * tablePositions[i];
           const ty = h * 0.65;
           const tableId = i + 1;
 
-          this.add.ellipse(tx, ty + 20, 110, 30, 0x000000, 0.2);
-          this.add.rectangle(tx - 30, ty + 15, 8, 25, 0x3a200a);
-          this.add.rectangle(tx + 30, ty + 15, 8, 25, 0x3a200a);
-          this.add.rectangle(tx, ty - 10, 80, 26, 0x8B4513);
-          this.add.text(tx, ty + 42, `Table ${tableId} (2/2 Max)`, { fontSize: '11px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
+          this.add.ellipse(tx, ty + 18, 96, 26, 0x000000, 0.2);
+          this.add.rectangle(tx - 24, ty + 14, 7, 24, 0x3a200a);
+          this.add.rectangle(tx + 24, ty + 14, 7, 24, 0x3a200a);
+          this.add.rectangle(tx, ty - 8, 68, 24, 0x8B4513);
+          this.add.text(tx, ty + 38, `Table ${tableId} (2/2)`, { fontSize: '10px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
 
-          const chairOffsets = [-55, 55];
+          const chairOffsets = [-42, 42];
           const chairs = [];
 
           for (let seatIdx = 0; seatIdx < 2; seatIdx++) {
             const cx = tx + chairOffsets[seatIdx];
             const cy = ty - 10;
 
-            this.add.rectangle(cx, cy + 10, 30, 22, 0x5c3a21);
-            this.add.rectangle(cx, cy - 10, 30, 20, 0x5c3a21);
-            const promptText = this.add.text(cx, cy - 28, 'CLICK TO SIT', { fontSize: '9px', fontStyle: 'bold', color: '#ffcc00' }).setOrigin(0.5);
+            this.add.rectangle(cx, cy + 10, 26, 20, 0x5c3a21);
+            this.add.rectangle(cx, cy - 8, 26, 18, 0x5c3a21);
+            const promptText = this.add.text(cx, cy - 26, 'SIT', { fontSize: '9px', fontStyle: 'bold', color: '#ffcc00' }).setOrigin(0.5);
 
-            const hitRect = this.add.rectangle(cx, cy, 54, 70, 0xffffff, 0.001).setInteractive({ cursor: 'pointer' });
+            const hitRect = this.add.rectangle(cx, cy, 48, 64, 0xffffff, 0.001).setInteractive({ cursor: 'pointer' });
             hitRect.on('pointerover', () => promptText.setScale(1.2));
             hitRect.on('pointerout', () => promptText.setScale(1.0));
             hitRect.on('pointerdown', () => {
@@ -564,7 +697,7 @@
           if (seatedTableId !== null) return;
           this.tableDisplayData.forEach(t => {
             t.chairs.forEach((c, seatIdx) => {
-              if (Phaser.Math.Distance.Between(pointer.x, pointer.y, c.cx, c.cy) < 40) {
+              if (Phaser.Math.Distance.Between(pointer.x, pointer.y, c.cx, c.cy) < 38) {
                 sitDown(t.id, seatIdx);
               }
             });
@@ -606,11 +739,13 @@
         });
       }
 
+      // Change 1 & 3: Displays Level alongside character name on avatar
       createNoobContainer(x, y, playerData) {
         const noob = this.add.container(x, y);
 
         const torsoHex = parseInt((playerData.torsoColor || myTorsoColor).replace('#', '0x'), 16);
         const headHex = parseInt((playerData.headColor || myHeadColor).replace('#', '0x'), 16);
+        const playerLvl = calculateLevel(playerData.coins || 0);
 
         const shadow = this.add.ellipse(0, 25, 30, 10, 0x000000, 0.25);
         const leftLeg = this.add.rectangle(-6, 12, 10, 18, 0x00a651);
@@ -623,8 +758,9 @@
         const rightEye = this.add.rectangle(4, -21, 2, 3, 0x000000);
         const smile = this.add.arc(0, -16, 4, 20, 160, false, 0x000000);
 
-        const tagBg = this.add.rectangle(0, -44, 90, 22, 0x000000, 0.75);
-        const nameText = this.add.text(0, -49, playerData.name, { fontSize: '10px', fontStyle: 'bold', color: '#fff' }).setOrigin(0.5);
+        // Overhead tag with Level + Character Name
+        const tagBg = this.add.rectangle(0, -44, 96, 22, 0x000000, 0.75);
+        const nameText = this.add.text(0, -49, `[Lv.${playerLvl}] ${playerData.name}`, { fontSize: '9px', fontStyle: 'bold', color: '#fff' }).setOrigin(0.5);
         const coinText = this.add.text(0, -38, `💰 ${playerData.coins} coins`, { fontSize: '9px', color: '#ffcc00' }).setOrigin(0.5);
 
         noob.add([shadow, leftLeg, rightLeg, torso, leftArm, rightArm, head, leftEye, rightEye, smile, tagBg, nameText, coinText]);
@@ -719,12 +855,12 @@
     function handleServerPacket(data) {
       switch (data.type) {
         case 'INIT_STATE':
-          updateServerBadge(data.serverPlayerCount, data.maxPlayers);
+          updateServerBadge(data.serverPlayerCount, 8);
           cachedTables = data.tables;
           if (phaserScene) phaserScene.syncWithState(data.tables);
           break;
         case 'SERVER_INFO':
-          updateServerBadge(data.count, 13);
+          updateServerBadge(data.count, 8);
           cachedTables = data.tables;
           if (phaserScene) phaserScene.syncWithState(data.tables);
           break;
@@ -898,10 +1034,12 @@
       }
     }
 
+    // Change 3: Updates HUD with Level display
     function updateHud() {
       document.getElementById('player-coins').innerText = coins;
+      document.getElementById('player-level-display').innerText = `Lv. ${calculateLevel(coins)}`;
     }
-    function updateServerBadge(count, max) {
+    function updateServerBadge(count, max = 8) {
       document.getElementById('server-capacity-badge').innerText = `Server Capacity: ${count} / ${max} Players`;
     }
     function showToast(msg) {
@@ -957,7 +1095,7 @@
       updateHud();
       if (window.DB) await window.DB.updateAttributes({ coins: coins, hat: id });
       if (isConnected && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'SYNC_PROFILE', coins, hat: id, firstGameDone, torsoColor: myTorsoColor, headColor: myHeadColor }));
+        ws.send(JSON.stringify({ type: 'SYNC_PROFILE', coins, hat: id, firstGameDone, torsoColor: myTorsoColor, headColor: myHeadColor, name: myPlayerName }));
       }
       showToast("Item equipped & saved to database!");
       closeShop();

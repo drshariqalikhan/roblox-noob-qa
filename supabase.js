@@ -1,14 +1,13 @@
 /**
- * supabase.js - Robust Database & Diagnostic Manager
+ * supabase.js - Robust Database & Diagnostic Manager with Leaderboard Support
  */
 
-// 1. Ensure global log array is always initialized
 window.DB_LOGS = window.DB_LOGS || [];
 
 window.logDB = function(level, message, data = null) {
   const entry = {
     time: new Date().toLocaleTimeString(),
-    level: level, // 'INFO', 'SUCCESS', 'WARN', 'ERROR'
+    level: level,
     message: message,
     data: data
   };
@@ -20,9 +19,8 @@ window.logDB = function(level, message, data = null) {
   }
 };
 
-window.logDB('INFO', 'supabase.js script loaded into browser.');
+window.logDB('INFO', 'supabase.js loaded.');
 
-// 2. Load Supabase Credentials (uses window.ENV from server.js with direct fallback)
 const DEFAULT_URL = "https://vefkmqcpoawbijynbsbl.supabase.co";
 const DEFAULT_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZlZmttcWNwb2F3YmlqeW5ic2JsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3MTE4OTksImV4cCI6MjEwODI4Nzg5OX0.20YADd_ZmyayvXb4FUuG5T2QdUftGzI2D9-B_1O8VPA";
 
@@ -34,21 +32,19 @@ const SUPABASE_ANON_KEY = (window.ENV && window.ENV.SUPABASE_ANON_KEY && window.
   ? window.ENV.SUPABASE_ANON_KEY.trim() 
   : DEFAULT_KEY;
 
-// 3. Initialize Supabase Client safely
 let supabaseClient = null;
 
 try {
   if (window.supabase && typeof window.supabase.createClient === 'function') {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    window.logDB('SUCCESS', `Supabase client created for: ${SUPABASE_URL}`);
+    window.logDB('SUCCESS', `Supabase client initialized for ${SUPABASE_URL}`);
   } else {
-    window.logDB('ERROR', 'window.supabase is missing. Check if @supabase/supabase-js CDN is blocked by an adblocker.');
+    window.logDB('ERROR', 'window.supabase is missing. Check CDN script.');
   }
 } catch (err) {
   window.logDB('ERROR', `Failed to create Supabase client: ${err.message}`, err);
 }
 
-// 4. Attach window.DB immediately
 window.DB = {
   getDeviceId() {
     let devId = localStorage.getItem('roblox_noob_device_uid');
@@ -64,56 +60,33 @@ window.DB = {
 
   async testConnection() {
     window.logDB('INFO', '--- Testing Supabase Connection ---');
-    
     if (!supabaseClient) {
       window.logDB('ERROR', 'Cannot test connection: Supabase client is null.');
       return { ok: false, error: 'Client not initialized' };
     }
 
     try {
-      window.logDB('INFO', 'Querying table "profiles"...');
       const { data, error, status } = await supabaseClient
         .from('profiles')
         .select('device_id')
         .limit(1);
 
       if (error) {
-        if (error.code === '42P01') {
-          window.logDB('ERROR', 'FATAL: Table "profiles" does not exist in your Supabase database! Run the SQL script in Supabase SQL Editor.', error);
-        } else if (error.code === '42501') {
-          window.logDB('ERROR', 'RLS ERROR: Row Level Security is blocking the "anon" key. Add SELECT and INSERT policies.', error);
-        } else {
-          window.logDB('ERROR', `Supabase error [${error.code}]: ${error.message} (HTTP ${status})`, error);
-        }
+        window.logDB('ERROR', `Supabase query error [${error.code}]: ${error.message}`);
         return { ok: false, error: error.message };
       }
 
-      window.logDB('SUCCESS', `Table "profiles" is online & accessible (HTTP ${status})!`);
-
-      // Test current device record
+      window.logDB('SUCCESS', `Table "profiles" connected (HTTP ${status}).`);
       const deviceId = this.getDeviceId();
-      window.logDB('INFO', `Looking up current device profile (${deviceId})...`);
-      
-      const { data: profile, error: pError } = await supabaseClient
+      const { data: profile } = await supabaseClient
         .from('profiles')
         .select('*')
         .eq('device_id', deviceId)
         .maybeSingle();
 
-      if (pError) {
-        window.logDB('WARN', `Error querying device record: ${pError.message}`);
-        return { ok: true, profile: null };
-      }
-
-      if (profile) {
-        window.logDB('SUCCESS', `Profile found in DB: "${profile.username}" with ${profile.coins} coins.`);
-      } else {
-        window.logDB('INFO', 'No profile found for this device yet (new user).');
-      }
-
       return { ok: true, profile };
     } catch (netErr) {
-      window.logDB('ERROR', `Network connection failed: ${netErr.message}`);
+      window.logDB('ERROR', `Network failure: ${netErr.message}`);
       return { ok: false, error: netErr.message };
     }
   },
@@ -129,12 +102,11 @@ window.DB = {
         .maybeSingle();
 
       if (error) {
-        window.logDB('ERROR', `getDeviceProfile error: ${error.message}`);
+        window.logDB('ERROR', `getDeviceProfile: ${error.message}`);
         return null;
       }
       return data;
     } catch (e) {
-      window.logDB('ERROR', `getDeviceProfile exception: ${e.message}`);
       return null;
     }
   },
@@ -165,7 +137,7 @@ window.DB = {
       throw error;
     }
 
-    window.logDB('SUCCESS', `Character "${characterData.username}" saved to database!`);
+    window.logDB('SUCCESS', `Character "${characterData.username}" registered in DB!`);
     return data;
   },
 
@@ -173,8 +145,6 @@ window.DB = {
     if (!supabaseClient) return null;
     try {
       const deviceId = this.getDeviceId();
-      window.logDB('INFO', `Updating attributes for ${deviceId}:`, updates);
-
       const { data, error } = await supabaseClient
         .from('profiles')
         .update({
@@ -186,14 +156,32 @@ window.DB = {
         .single();
 
       if (error) {
-        window.logDB('ERROR', `updateAttributes failed: ${error.message}`);
-      } else {
-        window.logDB('SUCCESS', 'Attributes synced with Supabase successfully.');
+        window.logDB('ERROR', `updateAttributes: ${error.message}`);
       }
       return data;
     } catch (e) {
-      window.logDB('ERROR', `updateAttributes exception: ${e.message}`);
       return null;
+    }
+  },
+
+  // Change 2: Fetch Leaderboard of all registered players
+  async getLeaderboard(limit = 25) {
+    if (!supabaseClient) return [];
+    try {
+      const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('username, coins, torso_color, head_color, hat')
+        .order('coins', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        window.logDB('ERROR', `Leaderboard fetch error: ${error.message}`);
+        return [];
+      }
+      return data || [];
+    } catch (err) {
+      window.logDB('ERROR', `Leaderboard exception: ${err.message}`);
+      return [];
     }
   }
 };

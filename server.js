@@ -9,7 +9,8 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 const PORT = process.env.PORT || 3000;
-const MAX_SERVER_PLAYERS = 13;
+// Change 4: Server capacity reduced to 8
+const MAX_SERVER_PLAYERS = 8;
 const MAX_COIN_STEAL = 30;
 
 // Dynamic config route to supply public keys to frontend
@@ -29,11 +30,12 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Tables setup: 3 tables * 2 chairs = 6 players playing max (Rule 1)
+// Change 4: 4 tables with 2 chairs each = 8 players max
 const tables = [
   { id: 1, seats: [null, null], duelState: null, waitTimer: null, waitSeconds: 60 },
   { id: 2, seats: [null, null], duelState: null, waitTimer: null, waitSeconds: 60 },
-  { id: 3, seats: [null, null], duelState: null, waitTimer: null, waitSeconds: 60 }
+  { id: 3, seats: [null, null], duelState: null, waitTimer: null, waitSeconds: 60 },
+  { id: 4, seats: [null, null], duelState: null, waitTimer: null, waitSeconds: 60 }
 ];
 
 const players = new Map();
@@ -55,6 +57,8 @@ function getSanitizedTables() {
       name: s.name,
       coins: s.coins,
       hat: s.hat,
+      torsoColor: s.torsoColor,
+      headColor: s.headColor,
       isBot: s.isBot || false
     } : null),
     waitSeconds: t.waitSeconds,
@@ -71,7 +75,7 @@ function sendToPlayer(playerId, payload) {
 
 wss.on('connection', (ws) => {
   if (players.size >= MAX_SERVER_PLAYERS) {
-    ws.send(JSON.stringify({ type: 'SERVER_FULL', message: 'Server is full (13/13 max players).' }));
+    ws.send(JSON.stringify({ type: 'SERVER_FULL', message: 'Server is full (8/8 max players).' }));
     ws.close();
     return;
   }
@@ -85,6 +89,8 @@ wss.on('connection', (ws) => {
     name: defaultName,
     coins: 0,
     hat: 'hat_none',
+    torsoColor: '#0055bf',
+    headColor: '#ffe800',
     tableId: null,
     seatIdx: null,
     firstGameDone: false
@@ -162,7 +168,23 @@ function handleMessage(player, data) {
     case 'SYNC_PROFILE': {
       player.coins = parseInt(data.coins) || 0;
       player.hat = data.hat || 'hat_none';
+      player.torsoColor = data.torsoColor || '#0055bf';
+      player.headColor = data.headColor || '#ffe800';
+      if (data.name) player.name = data.name;
       player.firstGameDone = !!data.firstGameDone;
+
+      // Update seat if player is seated
+      if (player.tableId !== null && player.seatIdx !== null) {
+        const table = tables.find(t => t.id === player.tableId);
+        if (table && table.seats[player.seatIdx]) {
+          table.seats[player.seatIdx].name = player.name;
+          table.seats[player.seatIdx].torsoColor = player.torsoColor;
+          table.seats[player.seatIdx].headColor = player.headColor;
+          table.seats[player.seatIdx].coins = player.coins;
+          table.seats[player.seatIdx].hat = player.hat;
+          broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
+        }
+      }
       break;
     }
 
@@ -183,6 +205,8 @@ function handleMessage(player, data) {
         name: player.name,
         coins: player.coins,
         hat: player.hat,
+        torsoColor: player.torsoColor,
+        headColor: player.headColor,
         isBot: false
       };
 
@@ -193,6 +217,8 @@ function handleMessage(player, data) {
           name: 'Computer (Easy)',
           coins: 40,
           hat: 'hat_none',
+          torsoColor: '#0055bf',
+          headColor: '#ffe800',
           isBot: true
         };
         table.seats[otherIdx] = tutorialBot;
@@ -324,6 +350,8 @@ function spawnComputerOpponent(table, player) {
     name: 'Roblox_AI_Bot',
     coins: 60,
     hat: 'hat_cap',
+    torsoColor: '#0055bf',
+    headColor: '#ffe800',
     isBot: true
   };
   table.seats[oppIdx] = computerPlayer;
