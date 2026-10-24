@@ -4,12 +4,23 @@ const path = require('path');
 const express = require('express');
 const { WebSocketServer, WebSocket } = require('ws');
 
+// Import the external Question Bank from questions.json
+let botQuestions = [];
+try {
+  botQuestions = require('./questions.json');
+} catch (err) {
+  console.warn("Could not load questions.json, using fallback questions.", err.message);
+  botQuestions = [
+    { q: "What color is a Roblox noob's torso?", a: "blue" },
+    { q: "What color is a Roblox noob's head?", a: "yellow" }
+  ];
+}
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 const PORT = process.env.PORT || 3000;
-// Change 4: Server capacity reduced to 8
 const MAX_SERVER_PLAYERS = 8;
 const MAX_COIN_STEAL = 30;
 
@@ -30,7 +41,7 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Change 4: 4 tables with 2 chairs each = 8 players max
+// 4 tables with 2 chairs each = 8 players max
 const tables = [
   { id: 1, seats: [null, null], duelState: null, waitTimer: null, waitSeconds: 60 },
   { id: 2, seats: [null, null], duelState: null, waitTimer: null, waitSeconds: 60 },
@@ -173,7 +184,6 @@ function handleMessage(player, data) {
       if (data.name) player.name = data.name;
       player.firstGameDone = !!data.firstGameDone;
 
-      // Update seat if player is seated
       if (player.tableId !== null && player.seatIdx !== null) {
         const table = tables.find(t => t.id === player.tableId);
         if (table && table.seats[player.seatIdx]) {
@@ -461,16 +471,11 @@ function resolveDuelRound(table, opponentGotCorrect, reason) {
   }, 1800);
 }
 
+// Selects random question from questions.json
 function botAskQuestion(table, humanPlayer) {
-  const botQuestions = [
-    { q: "What color is a Roblox noob's torso?", a: "blue" },
-    { q: "What color is a Roblox noob's head?", a: "yellow" },
-    { q: "What is 15 + 15?", a: "30" },
-    { q: "How many legs does a spider have?", a: "8" }
-  ];
   const chosen = botQuestions[Math.floor(Math.random() * botQuestions.length)];
   table.duelState.secretQuestion = chosen.q;
-  table.duelState.secretAnswer = chosen.a;
+  table.duelState.secretAnswer = chosen.a.toLowerCase().trim();
 
   sendToPlayer(humanPlayer.id, {
     type: 'PROMPT_ANSWER',

@@ -6,6 +6,7 @@
   <title>Roblox Noob Q&amp;A Arena</title>
   <meta name="theme-color" content="#101216">
 
+  <!-- Diagnostics Pre-logger -->
   <script>
     window.DB_LOGS = [];
     window.logDB = function(level, msg) {
@@ -14,14 +15,14 @@
     };
   </script>
 
-  <!-- 1. Phaser 3 Framework -->
+  <!-- External Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <!-- 2. Supabase Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- 3. Dynamic Environment Config -->
-  <script src="/config.js" onerror="window.logDB('WARN', '/config.js could not be loaded; using default credentials.')"></script>
-  <!-- 4. Database & Diagnostics File -->
+  <script src="/config.js" onerror="window.logDB('WARN', '/config.js could not be loaded; using defaults.')"></script>
   <script src="supabase.js" onerror="window.logDB('ERROR', 'Failed to load supabase.js!')"></script>
+
+  <!-- Stable Visual & Audio Game Engine File -->
+  <script src="gameEngine.js"></script>
 
   <style>
     :root {
@@ -35,7 +36,7 @@
       --text-main: #f1f2f6;
       --text-muted: #a4b0be;
     }
-    * { box-sizing: border-box; user-select: none; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    * { box-sizing: border-box; user-select: none; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
     body { background-color: var(--bg-dark); color: var(--text-main); overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
     
     header { background: rgba(18, 20, 26, 0.95); border-bottom: 2px solid var(--card-border); padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
@@ -48,7 +49,6 @@
     .level-badge { color: #a29bfe; border-color: rgba(162, 155, 254, 0.3); }
     .name-badge { color: #55efc4; border-color: rgba(85, 239, 196, 0.3); }
 
-    /* Live DB Status Pill */
     #db-status-badge { cursor: pointer; transition: all 0.2s; }
     #db-status-badge:hover { filter: brightness(1.25); }
     .db-ok { border-color: rgba(46, 213, 115, 0.5); color: var(--success); }
@@ -73,7 +73,7 @@
     .input-group label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; }
     input[type="text"] { width: 100%; padding: 10px 12px; background: #111317; border: 1px solid var(--card-border); border-radius: 6px; color: #fff; font-size: 0.95rem; outline: none; }
     input[type="color"] { width: 100%; height: 42px; background: #111317; border: 1px solid var(--card-border); border-radius: 6px; cursor: pointer; }
-    
+
     .timer-bar { height: 4px; background: #333; border-radius: 2px; overflow: hidden; margin-bottom: 12px; }
     .timer-progress { height: 100%; background: var(--accent); width: 100%; transition: width 1s linear; }
 
@@ -82,7 +82,6 @@
     .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; }
     .modal-body { padding: 20px; overflow-y: auto; font-size: 0.9rem; line-height: 1.5; }
 
-    /* Leaderboard Styling */
     .leaderboard-table { width: 100%; border-collapse: collapse; text-align: left; }
     .leaderboard-table th { padding: 10px 8px; border-bottom: 2px solid var(--card-border); color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; }
     .leaderboard-table td { padding: 10px 8px; border-bottom: 1px solid #232733; font-size: 0.88rem; vertical-align: middle; }
@@ -93,8 +92,7 @@
     .mini-noob-badge { display: inline-flex; align-items: center; gap: 8px; }
     .mini-avatar-dot { width: 14px; height: 14px; border-radius: 3px; display: inline-block; border: 1px solid #000; }
 
-    /* Diagnostic Console Output */
-    #log-terminal { background: #0b0c10; border: 1px solid #1f232b; border-radius: 8px; padding: 12px; font-family: 'Courier New', Courier, monospace; font-size: 0.8rem; height: 260px; overflow-y: auto; color: #c5c6c7; display: flex; flex-direction: column; gap: 5px; user-select: text; }
+    #log-terminal { background: #0b0c10; border: 1px solid #1f232b; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.8rem; height: 260px; overflow-y: auto; color: #c5c6c7; display: flex; flex-direction: column; gap: 5px; user-select: text; }
     .log-row { word-break: break-all; }
     .log-INFO { color: #8ed1fc; }
     .log-SUCCESS { color: #2ed573; font-weight: bold; }
@@ -118,16 +116,13 @@
     <div class="brand">
       <div class="brand-icon">OOF</div>
       <div>
-        <!-- Change 1: Fixed Arena Title -->
         <h1 id="hud-game-title">Roblox Noob Q&amp;A Arena</h1>
-        <!-- Change 4: Server Capacity 8 -->
         <small id="server-capacity-badge" style="color:var(--text-muted); font-size:0.72rem;">Server Capacity: 1 / 8 Players</small>
       </div>
     </div>
     
     <div class="stats-bar">
-      <!-- Change 1 & 3: Character Name and Level Badge in Header -->
-      <div class="badge name-badge" title="Your Character Name">
+      <div class="badge name-badge" title="Character Name">
         <span>👤</span>
         <span id="player-display-name">Noob</span>
       </div>
@@ -140,22 +135,20 @@
         <span id="player-coins">0</span> Coins
       </div>
 
-      <!-- Change 2: Leaderboard Button -->
       <button class="btn btn-gold" onclick="openLeaderboardModal()">🏆 Leaderboard</button>
       <button class="btn" onclick="openCustomizerModal()">🎨 Edit Noob</button>
       <button class="btn" onclick="openShop()">🛒 Shop</button>
       <button class="btn" onclick="openRules()">📜 Rules</button>
       <button class="btn btn-danger" onclick="openReportModal()">🚨 Report</button>
 
-      <!-- Live DB Health Badge -->
-      <div id="db-status-badge" class="badge db-warn" onclick="openDiagnosticModal()" title="Database Health Diagnostics">
+      <div id="db-status-badge" class="badge db-warn" onclick="openDiagnosticModal()" title="DB Diagnostics">
         <span id="db-status-icon">🟡</span>
         <span id="db-status-text">DB: Checking...</span>
       </div>
     </div>
   </header>
 
-  <!-- Phaser Game Container -->
+  <!-- Phaser Game Mount Area -->
   <div id="game-container">
     <div id="lobby-controls">
       <span id="match-status-text">Click an empty chair at a table to sit</span>
@@ -193,7 +186,7 @@
 
   <div id="toast">Connecting...</div>
 
-  <!-- Change 2: LEADERBOARD MODAL -->
+  <!-- LEADERBOARD MODAL -->
   <div id="leaderboard-modal" class="overlay-modal">
     <div class="modal-content" style="max-width: 580px;">
       <div class="modal-header">
@@ -220,7 +213,7 @@
     </div>
   </div>
 
-  <!-- DIAGNOSTIC / DATABASE LOG MODAL -->
+  <!-- DIAGNOSTIC / DB LOG MODAL -->
   <div id="diagnostic-modal" class="overlay-modal">
     <div class="modal-content" style="max-width: 600px;">
       <div class="modal-header">
@@ -232,22 +225,12 @@
           <span style="font-size:0.8rem; color:var(--text-muted);">Real-Time Connection Console</span>
           <button class="btn btn-accent" style="padding:4px 10px; font-size:0.75rem;" onclick="retestDatabaseConnection()">🔄 Re-test Connection</button>
         </div>
-
         <div id="log-terminal"></div>
-
-        <div style="margin-top:14px; padding:10px; background:#12141a; border-radius:6px; font-size:0.8rem; border-left:3px solid var(--accent);">
-          <strong>Common Fixes:</strong>
-          <ul style="padding-left:18px; margin-top:4px; color:#cbd5e1;">
-            <li><strong>Code 42P01:</strong> Table <code>profiles</code> is missing. Run the SQL script in your Supabase SQL editor.</li>
-            <li><strong>Code 42501:</strong> RLS policy missing. Ensure policies exist for <code>anon</code> role.</li>
-            <li><strong>Adblockers:</strong> Brave Shields or uBlock Origin sometimes block <code>supabase.co</code> network requests.</li>
-          </ul>
-        </div>
       </div>
     </div>
   </div>
 
-  <!-- Character Creator / Customizer Modal -->
+  <!-- Customizer Modal -->
   <div id="character-modal" class="overlay-modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -255,9 +238,6 @@
         <button class="btn" onclick="closeCustomizerModal()">✕</button>
       </div>
       <div class="modal-body">
-        <p style="color:var(--text-muted); margin-bottom: 14px; font-size: 0.85rem;">
-          Your custom character name, level, and colors will be saved in the database.
-        </p>
         <form id="char-form" onsubmit="handleSaveCharacter(event)">
           <div class="input-group">
             <label>Character Name</label>
@@ -281,7 +261,7 @@
     </div>
   </div>
 
-  <!-- Rules Modal (Updated with 4 tables / 8 max players) -->
+  <!-- Rules Modal -->
   <div id="rules-modal" class="overlay-modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -293,7 +273,7 @@
           <h3>Normal Rules</h3>
           <ol>
             <li><strong>8 people max in 1 game.</strong> (4 tables with 2 chairs each).</li>
-            <li><strong>The max coins you can take is 30.</strong> (Or all remaining coins if under 30).</li>
+            <li><strong>The max coins you can take is 30.</strong></li>
             <li><strong>NO BOTS!</strong> Any bot that joins will be banned.</li>
             <li><strong>No: Glitching, exploiting, hacking or cheating.</strong></li>
             <li><strong>The max people in the server is 8.</strong></li>
@@ -303,9 +283,9 @@
           <h3>Gameplay Rules</h3>
           <ol>
             <li><strong>People can steal your coins. Watch out!</strong></li>
-            <li><strong>One computer for players who just joined.</strong> (Noob is guaranteed to win against computer for 100 bonus coins!)</li>
+            <li><strong>One computer for players who just joined.</strong> (Guaranteed win for 100 bonus coins!)</li>
             <li><strong>Have Fun!</strong></li>
-            <li><strong>Report rule violators immediately.</strong> (Earn <strong>+10 coins</strong> bounty reward!).</li>
+            <li><strong>Report rule violators immediately.</strong> (+10 coins bounty reward!).</li>
           </ol>
         </div>
       </div>
@@ -334,9 +314,7 @@
         <button class="btn" onclick="closeReportModal()">✕</button>
       </div>
       <div class="modal-body">
-        <p style="color:var(--text-muted); margin-bottom: 12px;">
-          Handwritten Rule 5: Report violators or bots. If confirmed, claim a <strong>+10 coins</strong> bounty!
-        </p>
+        <p style="color:var(--text-muted); margin-bottom: 12px;">Report violators to claim a <strong>+10 coins</strong> bounty!</p>
         <div class="input-group">
           <label>Violator Username / Bot ID</label>
           <input type="text" id="report-user-input" placeholder="e.g. Glitcher99">
@@ -346,10 +324,8 @@
     </div>
   </div>
 
+  <!-- Game Logic & Network Script -->
   <script>
-    /* ==========================================================
-       1. GLOBAL STATE & LOG STREAMER
-       ========================================================== */
     let deviceId = null;
     let coins = 0;
     let firstGameDone = false;
@@ -361,7 +337,6 @@
     let seatedTableId = null;
     let seatedSeatIdx = null;
 
-    // Change 4: 4 tables cached state
     let cachedTables = [
       { id: 1, seats: [null, null], waitSeconds: 60 },
       { id: 2, seats: [null, null], waitSeconds: 60 },
@@ -369,16 +344,15 @@
       { id: 4, seats: [null, null], waitSeconds: 60 }
     ];
 
-    // Change 3: Level Formula (Level 1: 0-49 coins, Level 2: 50-99 coins, etc.)
-    function calculateLevel(coinCount) {
-      const c = Math.max(0, parseInt(coinCount) || 0);
-      return Math.floor(c / 50) + 1;
-    }
-
-    // Real-Time Log Listener
-    window.onNewDBLog = (entry) => {
-      renderLogToTerminal(entry);
+    // Bridge from gameEngine.js: Click chair handler
+    window.onChairClicked = function(tableId, seatIdx) {
+      if (seatedTableId === null) {
+        sitDown(tableId, seatIdx);
+      }
     };
+
+    // Logging & DB Diagnostics UI
+    window.onNewDBLog = (entry) => renderLogToTerminal(entry);
 
     function renderLogToTerminal(entry) {
       const terminal = document.getElementById('log-terminal');
@@ -395,7 +369,7 @@
       if (!terminal) return;
       terminal.innerHTML = '';
       if (!window.DB_LOGS || window.DB_LOGS.length === 0) {
-        terminal.innerHTML = '<div style="color:var(--text-muted);">No logs recorded yet. Click "Re-test Connection".</div>';
+        terminal.innerHTML = '<div style="color:var(--text-muted);">No logs recorded yet.</div>';
         return;
       }
       window.DB_LOGS.forEach(renderLogToTerminal);
@@ -406,17 +380,10 @@
       const icon = document.getElementById('db-status-icon');
       const label = document.getElementById('db-status-text');
       badge.className = `badge db-${status}`;
-
-      if (status === 'ok') icon.innerText = '🟢';
-      else if (status === 'warn') icon.innerText = '🟡';
-      else icon.innerText = '🔴';
-
+      icon.innerText = status === 'ok' ? '🟢' : (status === 'warn' ? '🟡' : '🔴');
       label.innerText = text;
     }
 
-    /* ==========================================================
-       2. STARTUP HEALTH CHECK & DIAGNOSTICS
-       ========================================================== */
     window.addEventListener('DOMContentLoaded', async () => {
       renderAllLogs();
       await runDatabaseStartupTest();
@@ -424,15 +391,12 @@
 
     async function runDatabaseStartupTest() {
       setDBStatusBadge('warn', 'DB: Testing...');
-
       if (!window.DB || typeof window.DB.testConnection !== 'function') {
-        window.logDB('ERROR', 'window.DB is not defined! Check if supabase.js is loaded.');
-        setDBStatusBadge('err', 'DB: Error (Click to View)');
+        window.logDB('ERROR', 'window.DB is not defined.');
+        setDBStatusBadge('err', 'DB: Error');
         return;
       }
-
       const result = await window.DB.testConnection();
-
       if (result.ok) {
         setDBStatusBadge('ok', 'DB: Connected');
         if (result.profile) {
@@ -443,7 +407,6 @@
         }
       } else {
         setDBStatusBadge('err', 'DB: Error (Click to View)');
-        showToast("⚠️ Supabase error! Click the red DB badge to view logs.");
       }
     }
 
@@ -452,56 +415,9 @@
       await runDatabaseStartupTest();
     }
 
-    function openDiagnosticModal() {
-      renderAllLogs();
-      document.getElementById('diagnostic-modal').style.display = 'flex';
-    }
-    function closeDiagnosticModal() {
-      document.getElementById('diagnostic-modal').style.display = 'none';
-    }
+    function openDiagnosticModal() { renderAllLogs(); document.getElementById('diagnostic-modal').style.display = 'flex'; }
+    function closeDiagnosticModal() { document.getElementById('diagnostic-modal').style.display = 'none'; }
 
-    // Audio Synthesizer
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function playBeep(type = 'blip') {
-      try {
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        const now = audioCtx.currentTime;
-        if (type === 'blip') {
-          osc.frequency.setValueAtTime(440, now);
-          osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
-          gain.gain.setValueAtTime(0.15, now);
-          gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
-          osc.start(now); osc.stop(now + 0.1);
-        } else if (type === 'win') {
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(330, now);
-          osc.frequency.setValueAtTime(554, now + 0.2);
-          gain.gain.setValueAtTime(0.2, now);
-          gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
-          osc.start(now); osc.stop(now + 0.4);
-        } else if (type === 'oof') {
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(160, now);
-          osc.frequency.exponentialRampToValueAtTime(60, now + 0.2);
-          gain.gain.setValueAtTime(0.3, now);
-          gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
-          osc.start(now); osc.stop(now + 0.2);
-        } else if (type === 'coin') {
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(987, now);
-          osc.frequency.setValueAtTime(1318, now + 0.08);
-          gain.gain.setValueAtTime(0.2, now);
-          gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
-          osc.start(now); osc.stop(now + 0.3);
-        }
-      } catch (e) {}
-    }
-
-    // Change 1 & 3: Character name and level applied cleanly
     function applyProfile(profile) {
       myPlayerName = profile.username || myPlayerName;
       coins = profile.coins !== undefined ? profile.coins : coins;
@@ -516,9 +432,8 @@
       document.getElementById('char-head-color').value = myHeadColor;
       updateHud();
 
-      // Refresh Phaser canvas if already seated
-      if (phaserScene) {
-        phaserScene.syncWithState(cachedTables);
+      if (window.syncPhaserTables) {
+        window.syncPhaserTables(cachedTables);
       }
 
       if (isConnected && ws.readyState === WebSocket.OPEN) {
@@ -573,7 +488,6 @@
       document.getElementById('character-modal').style.display = 'none';
     }
 
-    // Change 2: Leaderboard modal fetch & display
     async function openLeaderboardModal() {
       const modal = document.getElementById('leaderboard-modal');
       const tbody = document.getElementById('leaderboard-tbody');
@@ -588,7 +502,6 @@
       const playersList = await window.DB.getLeaderboard(20);
 
       if (!playersList || playersList.length === 0) {
-        // Fallback display if database has only current player or is empty
         tbody.innerHTML = `
           <tr>
             <td class="rank-cell rank-1">#1</td>
@@ -598,7 +511,7 @@
                 <strong>${myPlayerName}</strong> (You)
               </div>
             </td>
-            <td><span style="color:#a29bfe; font-weight:bold;">Lv. ${calculateLevel(coins)}</span></td>
+            <td><span style="color:#a29bfe; font-weight:bold;">Lv. ${window.calculateLevel(coins)}</span></td>
             <td><strong style="color:var(--accent);">💰 ${coins}</strong></td>
           </tr>
         `;
@@ -609,7 +522,7 @@
       playersList.forEach((p, idx) => {
         const rank = idx + 1;
         const rankClass = rank === 1 ? 'rank-1' : (rank === 2 ? 'rank-2' : (rank === 3 ? 'rank-3' : ''));
-        const level = calculateLevel(p.coins);
+        const level = window.calculateLevel(p.coins);
         const isMe = p.username === myPlayerName;
 
         const row = document.createElement('tr');
@@ -633,191 +546,7 @@
     }
 
     /* ==========================================================
-       3. PHASER 3 ENGINE (4 Tables Layout & Level Displays)
-       ========================================================== */
-    let phaserScene = null;
-
-    class ArenaScene extends Phaser.Scene {
-      constructor() { super({ key: 'ArenaScene' }); }
-
-      create() {
-        phaserScene = this;
-        const w = this.scale.width;
-        const h = this.scale.height;
-
-        this.add.rectangle(w / 2, h * 0.225, w, h * 0.45, 0x1da1f2);
-        this.clouds = [];
-        for (let i = 0; i < 5; i++) {
-          this.clouds.push(this.add.rectangle(Phaser.Math.Between(0, w), Phaser.Math.Between(30, h * 0.3), 110, 35, 0xffffff, 0.85));
-        }
-
-        this.add.rectangle(w / 2, h * 0.725, w, h * 0.55, 0x43a047);
-        this.add.grid(w / 2, h * 0.725, w, h * 0.55, 45, 45, null, null, 0x000000, 0.08);
-
-        // Change 4: 4 Tables spread evenly across screen
-        this.tableDisplayData = [];
-        const tablePositions = [0.14, 0.38, 0.62, 0.86];
-
-        for (let i = 0; i < 4; i++) {
-          const tx = w * tablePositions[i];
-          const ty = h * 0.65;
-          const tableId = i + 1;
-
-          this.add.ellipse(tx, ty + 18, 96, 26, 0x000000, 0.2);
-          this.add.rectangle(tx - 24, ty + 14, 7, 24, 0x3a200a);
-          this.add.rectangle(tx + 24, ty + 14, 7, 24, 0x3a200a);
-          this.add.rectangle(tx, ty - 8, 68, 24, 0x8B4513);
-          this.add.text(tx, ty + 38, `Table ${tableId} (2/2)`, { fontSize: '10px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
-
-          const chairOffsets = [-42, 42];
-          const chairs = [];
-
-          for (let seatIdx = 0; seatIdx < 2; seatIdx++) {
-            const cx = tx + chairOffsets[seatIdx];
-            const cy = ty - 10;
-
-            this.add.rectangle(cx, cy + 10, 26, 20, 0x5c3a21);
-            this.add.rectangle(cx, cy - 8, 26, 18, 0x5c3a21);
-            const promptText = this.add.text(cx, cy - 26, 'SIT', { fontSize: '9px', fontStyle: 'bold', color: '#ffcc00' }).setOrigin(0.5);
-
-            const hitRect = this.add.rectangle(cx, cy, 48, 64, 0xffffff, 0.001).setInteractive({ cursor: 'pointer' });
-            hitRect.on('pointerover', () => promptText.setScale(1.2));
-            hitRect.on('pointerout', () => promptText.setScale(1.0));
-            hitRect.on('pointerdown', () => {
-              if (seatedTableId === null) sitDown(tableId, seatIdx);
-            });
-
-            chairs.push({ cx, cy, promptText, hitRect, avatarContainer: null });
-          }
-
-          this.tableDisplayData.push({ id: tableId, chairs });
-        }
-
-        this.input.on('pointerdown', (pointer) => {
-          if (seatedTableId !== null) return;
-          this.tableDisplayData.forEach(t => {
-            t.chairs.forEach((c, seatIdx) => {
-              if (Phaser.Math.Distance.Between(pointer.x, pointer.y, c.cx, c.cy) < 38) {
-                sitDown(t.id, seatIdx);
-              }
-            });
-          });
-        });
-
-        this.syncWithState(cachedTables);
-      }
-
-      update() {
-        this.clouds.forEach(c => {
-          c.x += 0.3;
-          if (c.x > this.scale.width + 80) c.x = -80;
-        });
-      }
-
-      syncWithState(tables) {
-        if (!this.tableDisplayData) return;
-        tables.forEach((tData, tIdx) => {
-          const tDisplay = this.tableDisplayData[tIdx];
-          if (!tDisplay) return;
-
-          tData.seats.forEach((seatData, sIdx) => {
-            const chair = tDisplay.chairs[sIdx];
-            if (!chair) return;
-
-            if (chair.avatarContainer) {
-              chair.avatarContainer.destroy();
-              chair.avatarContainer = null;
-            }
-
-            if (seatData) {
-              chair.promptText.setVisible(false);
-              chair.avatarContainer = this.createNoobContainer(chair.cx, chair.cy - 15, seatData);
-            } else {
-              chair.promptText.setVisible(true);
-            }
-          });
-        });
-      }
-
-      // Change 1 & 3: Displays Level alongside character name on avatar
-      createNoobContainer(x, y, playerData) {
-        const noob = this.add.container(x, y);
-
-        const torsoHex = parseInt((playerData.torsoColor || myTorsoColor).replace('#', '0x'), 16);
-        const headHex = parseInt((playerData.headColor || myHeadColor).replace('#', '0x'), 16);
-        const playerLvl = calculateLevel(playerData.coins || 0);
-
-        const shadow = this.add.ellipse(0, 25, 30, 10, 0x000000, 0.25);
-        const leftLeg = this.add.rectangle(-6, 12, 10, 18, 0x00a651);
-        const rightLeg = this.add.rectangle(6, 12, 10, 18, 0x00a651);
-        const torso = this.add.rectangle(0, -4, 26, 20, torsoHex);
-        const leftArm = this.add.rectangle(-17, -4, 8, 18, headHex);
-        const rightArm = this.add.rectangle(17, -4, 8, 18, headHex);
-        const head = this.add.rectangle(0, -19, 18, 16, headHex);
-        const leftEye = this.add.rectangle(-4, -21, 2, 3, 0x000000);
-        const rightEye = this.add.rectangle(4, -21, 2, 3, 0x000000);
-        const smile = this.add.arc(0, -16, 4, 20, 160, false, 0x000000);
-
-        // Overhead tag with Level + Character Name
-        const tagBg = this.add.rectangle(0, -44, 96, 22, 0x000000, 0.75);
-        const nameText = this.add.text(0, -49, `[Lv.${playerLvl}] ${playerData.name}`, { fontSize: '9px', fontStyle: 'bold', color: '#fff' }).setOrigin(0.5);
-        const coinText = this.add.text(0, -38, `💰 ${playerData.coins} coins`, { fontSize: '9px', color: '#ffcc00' }).setOrigin(0.5);
-
-        noob.add([shadow, leftLeg, rightLeg, torso, leftArm, rightArm, head, leftEye, rightEye, smile, tagBg, nameText, coinText]);
-
-        if (playerData.hat === 'hat_cap') {
-          noob.add([
-            this.add.rectangle(0, -27, 22, 5, 0xff0033),
-            this.add.rectangle(4, -25, 26, 2, 0xff0033)
-          ]);
-        } else if (playerData.hat === 'hat_crown') {
-          noob.add(this.add.rectangle(0, -29, 20, 6, 0xffd700));
-        }
-
-        this.tweens.add({
-          targets: noob,
-          y: '-=3',
-          duration: 900,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut'
-        });
-
-        return noob;
-      }
-
-      spawnCoinFloat(x, y, text, color) {
-        const floatText = this.add.text(x, y, text, {
-          fontSize: '18px',
-          fontStyle: 'bold',
-          color: color,
-          stroke: '#000000',
-          strokeThickness: 3
-        }).setOrigin(0.5);
-
-        this.tweens.add({
-          targets: floatText,
-          y: y - 50,
-          alpha: 0,
-          duration: 1600,
-          ease: 'Cubic.easeOut',
-          onComplete: () => floatText.destroy()
-        });
-      }
-    }
-
-    const containerEl = document.getElementById('game-container');
-    const phaserGame = new Phaser.Game({
-      type: Phaser.AUTO,
-      parent: 'game-container',
-      width: containerEl.clientWidth || window.innerWidth,
-      height: containerEl.clientHeight || (window.innerHeight - 60),
-      scene: [ArenaScene],
-      scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH }
-    });
-
-    /* ==========================================================
-       4. WEBSOCKET SYNC
+       WEBSOCKET NETWORKING & GAMEPLAY
        ========================================================== */
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     let ws = null;
@@ -857,16 +586,16 @@
         case 'INIT_STATE':
           updateServerBadge(data.serverPlayerCount, 8);
           cachedTables = data.tables;
-          if (phaserScene) phaserScene.syncWithState(data.tables);
+          if (window.syncPhaserTables) window.syncPhaserTables(data.tables);
           break;
         case 'SERVER_INFO':
           updateServerBadge(data.count, 8);
           cachedTables = data.tables;
-          if (phaserScene) phaserScene.syncWithState(data.tables);
+          if (window.syncPhaserTables) window.syncPhaserTables(data.tables);
           break;
         case 'TABLE_UPDATE':
           cachedTables = data.tables;
-          if (phaserScene) phaserScene.syncWithState(data.tables);
+          if (window.syncPhaserTables) window.syncPhaserTables(data.tables);
 
           if (seatedTableId !== null) {
             const tbl = data.tables.find(t => t.id === seatedTableId);
@@ -892,7 +621,7 @@
           coins += data.bonus;
           updateHud();
           if (window.DB) window.DB.updateAttributes({ coins: coins, first_game_done: true });
-          playBeep('win');
+          if (window.playBeep) window.playBeep('win');
           showToast(data.message);
           standUp();
           break;
@@ -913,12 +642,12 @@
           showToast(`${data.reason} ${data.winnerName} stole ${data.stolen} coins!`);
           if (data.winnerName === myPlayerName) {
             coins += data.stolen;
-            playBeep('coin');
-            if (phaserScene) phaserScene.spawnCoinFloat(window.innerWidth / 2, window.innerHeight * 0.5, `+${data.stolen} COINS!`, '#ffcc00');
+            if (window.playBeep) window.playBeep('coin');
+            if (window.spawnCoinFloat) window.spawnCoinFloat(`+${data.stolen} COINS!`, '#ffcc00');
           } else if (data.loserName === myPlayerName) {
             coins -= data.stolen;
-            playBeep('oof');
-            if (phaserScene) phaserScene.spawnCoinFloat(window.innerWidth / 2, window.innerHeight * 0.5, `-${data.stolen} COINS!`, '#ff4757');
+            if (window.playBeep) window.playBeep('oof');
+            if (window.spawnCoinFloat) window.spawnCoinFloat(`-${data.stolen} COINS!`, '#ff4757');
           }
           updateHud();
           if (window.DB) window.DB.updateAttributes({ coins: coins });
@@ -931,7 +660,7 @@
           coins += data.bounty;
           updateHud();
           if (window.DB) window.DB.updateAttributes({ coins: coins });
-          playBeep('win');
+          if (window.playBeep) window.playBeep('win');
           showToast(data.message);
           break;
         case 'OPPONENT_LEFT':
@@ -947,7 +676,7 @@
       seatedSeatIdx = seatIdx;
       document.getElementById('btn-stand-up').style.display = 'inline-flex';
       document.getElementById('btn-force-bot').style.display = 'inline-flex';
-      playBeep('blip');
+      if (window.playBeep) window.playBeep('blip');
 
       if (isConnected && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
@@ -959,7 +688,7 @@
         const botSeatIdx = seatIdx === 0 ? 1 : 0;
         cachedTables[tableId - 1].seats[seatIdx] = { id: deviceId, name: myPlayerName, coins, hat: equipped.hat, torsoColor: myTorsoColor, headColor: myHeadColor };
         cachedTables[tableId - 1].seats[botSeatIdx] = { id: 'bot_local', name: 'Computer_Bot', coins: 60, hat: 'hat_cap' };
-        if (phaserScene) phaserScene.syncWithState(cachedTables);
+        if (window.syncPhaserTables) window.syncPhaserTables(cachedTables);
         document.getElementById('match-status-text').innerText = "Dueling Computer_Bot!";
         setTimeout(() => openAskModal(), 1000);
       }
@@ -983,7 +712,7 @@
       document.getElementById('match-status-text').innerText = "Click an empty chair at a table to sit";
       closeModal('modal-ask');
       closeModal('modal-answer');
-      playBeep('blip');
+      if (window.playBeep) window.playBeep('blip');
     }
 
     function openAskModal() {
@@ -1034,14 +763,17 @@
       }
     }
 
-    // Change 3: Updates HUD with Level display
     function updateHud() {
       document.getElementById('player-coins').innerText = coins;
-      document.getElementById('player-level-display').innerText = `Lv. ${calculateLevel(coins)}`;
+      if (window.calculateLevel) {
+        document.getElementById('player-level-display').innerText = `Lv. ${window.calculateLevel(coins)}`;
+      }
     }
+
     function updateServerBadge(count, max = 8) {
       document.getElementById('server-capacity-badge').innerText = `Server Capacity: ${count} / ${max} Players`;
     }
+
     function showToast(msg) {
       const toast = document.getElementById('toast');
       toast.innerText = msg;
