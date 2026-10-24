@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Roblox Noob Q&amp;A Arena </title>
+  <title>Roblox Noob Q&amp;A Arena</title>
   <meta name="theme-color" content="#101216">
 
   <!-- Diagnostics Pre-logger -->
@@ -181,6 +181,32 @@
         <input type="text" id="player-answer-input" placeholder="Type answer here..." autocomplete="off">
       </div>
       <button class="btn btn-accent" style="width:100%; justify-content:center;" onclick="submitPlayerAnswer()">Submit Answer</button>
+    </div>
+
+    <!-- DUEL REVEAL MODAL (Shows opponent's response before declaring winner) -->
+    <div id="modal-result" class="game-modal" style="text-align: center; max-width: 440px;">
+      <h2 style="justify-content: center; margin-bottom: 12px; color: var(--accent);">⚔️ Duel Response</h2>
+      
+      <div style="background:#111317; border-radius:8px; padding:10px 12px; margin-bottom:12px; text-align:left;">
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Question</div>
+        <div id="result-question" style="font-size:0.95rem; font-weight:600; color:#fff; margin-top:2px;"></div>
+      </div>
+
+      <div style="display:flex; gap:10px; margin-bottom:12px;">
+        <div style="flex:1; background:#111317; border-radius:8px; padding:10px; text-align:left;">
+          <div id="result-answerer-label" style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase;">Response</div>
+          <div id="result-submitted-answer" style="font-size:1.05rem; font-weight:700; color:var(--accent); margin-top:2px;"></div>
+        </div>
+        <div style="flex:1; background:#111317; border-radius:8px; padding:10px; text-align:left;">
+          <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase;">Secret Answer</div>
+          <div id="result-secret-answer" style="font-size:1.05rem; font-weight:700; color:var(--success); margin-top:2px;"></div>
+        </div>
+      </div>
+
+      <div id="result-verdict-badge" style="padding:8px 12px; border-radius:6px; font-weight:800; font-size:1rem; margin-bottom:10px;"></div>
+      <div id="result-coin-summary" style="font-size:0.88rem; font-weight:600; color:var(--text-muted); margin-bottom:14px;"></div>
+
+      <button class="btn btn-accent" style="width:100%; justify-content:center;" onclick="closeModal('modal-result')">Continue</button>
     </div>
   </div>
 
@@ -545,6 +571,44 @@
       document.getElementById('leaderboard-modal').style.display = 'none';
     }
 
+    // Displays the opponent's response before declaring outcome
+    function showDuelResponseModal(data) {
+      document.getElementById('result-question').innerText = `"${data.question}"`;
+      document.getElementById('result-answerer-label').innerText = `${data.answererName}'s Response`;
+      document.getElementById('result-submitted-answer').innerText = `"${data.submittedAnswer || '(No Answer)'}"`;
+      document.getElementById('result-secret-answer').innerText = `"${data.secretAnswer}"`;
+
+      const badge = document.getElementById('result-verdict-badge');
+      if (data.isCorrect) {
+        badge.innerText = `✅ ${data.answererName} was CORRECT!`;
+        badge.style.background = "rgba(46, 213, 115, 0.25)";
+        badge.style.color = "var(--success)";
+        badge.style.border = "1px solid var(--success)";
+      } else {
+        badge.innerText = `❌ ${data.answererName} was WRONG!`;
+        badge.style.background = "rgba(255, 71, 87, 0.25)";
+        badge.style.color = "var(--danger)";
+        badge.style.border = "1px solid var(--danger)";
+      }
+
+      const summary = document.getElementById('result-coin-summary');
+      if (data.isTutorial) {
+        summary.innerText = "🎉 Tutorial Win! +100 Coins Awarded!";
+      } else if (data.stolen > 0) {
+        summary.innerText = `💰 ${data.winnerName} stole ${data.stolen} coins from ${data.loserName}!`;
+      } else {
+        summary.innerText = "No coins transferred.";
+      }
+
+      document.getElementById('modal-result').style.display = 'block';
+
+      // Auto-dismiss after 4 seconds
+      clearTimeout(window.resultModalTimeout);
+      window.resultModalTimeout = setTimeout(() => {
+        closeModal('modal-result');
+      }, 4000);
+    }
+
     /* ==========================================================
        WEBSOCKET NETWORKING & GAMEPLAY
        ========================================================== */
@@ -616,15 +680,6 @@
           document.getElementById('btn-force-bot').style.display = 'none';
           setTimeout(() => openAskModal(), 1000);
           break;
-        case 'FIRST_WIN_COMPLETED':
-          firstGameDone = true;
-          coins += data.bonus;
-          updateHud();
-          if (window.DB) window.DB.updateAttributes({ coins: coins, first_game_done: true });
-          if (window.playBeep) window.playBeep('win');
-          showToast(data.message);
-          standUp();
-          break;
         case 'PROMPT_ASK':
           showToast(`Your turn to ask a question to ${data.opponentName}!`);
           document.getElementById('match-status-text').innerText = `Dueling against ${data.opponentName}!`;
@@ -639,7 +694,19 @@
           promptAnswerModal(data.question, data.askerName);
           break;
         case 'ROUND_RESULT':
-          showToast(`${data.reason} ${data.winnerName} stole ${data.stolen} coins!`);
+          // Show the response reveal modal first!
+          showDuelResponseModal(data);
+
+          if (data.isTutorial) {
+            firstGameDone = true;
+            coins += data.stolen;
+            updateHud();
+            if (window.DB) window.DB.updateAttributes({ coins: coins, first_game_done: true });
+            if (window.playBeep) window.playBeep('win');
+            standUp();
+            break;
+          }
+
           if (data.winnerName === myPlayerName) {
             coins += data.stolen;
             if (window.playBeep) window.playBeep('coin');
@@ -712,6 +779,7 @@
       document.getElementById('match-status-text').innerText = "Click an empty chair at a table to sit";
       closeModal('modal-ask');
       closeModal('modal-answer');
+      closeModal('modal-result');
       if (window.playBeep) window.playBeep('blip');
     }
 

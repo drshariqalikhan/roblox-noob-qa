@@ -4,7 +4,7 @@ const path = require('path');
 const express = require('express');
 const { WebSocketServer, WebSocket } = require('ws');
 
-// Import the external Question Bank from questions.json
+// Import Question Bank from questions.json
 let botQuestions = [];
 try {
   botQuestions = require('./questions.json');
@@ -24,7 +24,37 @@ const PORT = process.env.PORT || 3000;
 const MAX_SERVER_PLAYERS = 8;
 const MAX_COIN_STEAL = 30;
 
-// Dynamic config route to supply public keys to frontend
+// Keyless Free LLM (Pollinations.ai) to guess answers dynamically
+async function getKeylessAIGuess(questionText) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+
+    const response = await fetch("https://text.pollinations.ai/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: "You are a trivia player. Answer the question in 1 to 3 words only. No full sentences, no punctuation." },
+          { role: "user", content: questionText }
+        ],
+        model: "openai",
+        seed: Math.floor(Math.random() * 1000)
+      })
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const answer = await response.text();
+    return answer.trim();
+  } catch (err) {
+    console.warn("Pollinations AI unreachable, falling back to random:", err.message);
+    return null;
+  }
+}
+
+// Dynamic config route for frontend Supabase credentials
 app.get('/config.js', (req, res) => {
   res.type('application/javascript');
   res.send(`
@@ -41,7 +71,7 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// 4 tables with 2 chairs each = 8 players max
+// 4 tables * 2 chairs = 8 max players
 const tables = [
   { id: 1, seats: [null, null], duelState: null, waitTimer: null, waitSeconds: 60 },
   { id: 2, seats: [null, null], duelState: null, waitTimer: null, waitSeconds: 60 },
@@ -301,23 +331,39 @@ function handleMessage(player, data) {
       if (!question || !answer) return;
 
       table.duelState.secretQuestion = question.trim();
-      table.duelState.secretAnswer = answer.trim().toLowerCase();
+      table.duelState.secretAnswer = answer.trim();
 
       const oppIdx = player.seatIdx === 0 ? 1 : 0;
       const opponent = table.seats[oppIdx];
 
       if (opponent.isBot) {
         if (table.duelState.isTutorial) {
+          // Tutorial bot intentionally gives an absurd answer
           setTimeout(() => {
-            resolveDuelRound(table, false, "Computer guessed: 'uhh... 42?'");
+            resolveDuelRound(table, false, "uhh... 42?");
           }, 1200);
         } else {
-          const aiCorrect = Math.random() < 0.35;
-          setTimeout(() => {
-            resolveDuelRound(table, aiCorrect, aiCorrect ? "Computer guessed correctly!" : "Computer guessed wrong!");
-          }, 1500);
+          // Use keyless LLM to guess the player's question!
+          (async () => {
+            const aiGuess = await getKeylessAIGuess(question);
+            let isCorrect = false;
+            let finalGuess = aiGuess;
+
+            if (aiGuess) {
+              const cleanSecret = answer.toLowerCase().replace(/[^a-z0-9]/g, '');
+              const cleanGuess = aiGuess.toLowerCase().replace(/[^a-z0-9]/g, '');
+              isCorrect = cleanGuess === cleanSecret || cleanGuess.includes(cleanSecret) || cleanSecret.includes(cleanGuess);
+            } else {
+              // Fallback if network drops
+              isCorrect = Math.random() < 0.35;
+              finalGuess = isCorrect ? answer : "Potato";
+            }
+
+            resolveDuelRound(table, isCorrect, finalGuess);
+          })();
         }
       } else {
+        // Send to opposing human player
         sendToPlayer(opponent.id, {
           type: 'PROMPT_ANSWER',
           question: question,
@@ -331,9 +377,12 @@ function handleMessage(player, data) {
       const table = tables.find(t => t.id === player.tableId);
       if (!table || !table.duelState) return;
 
-      const userAns = (data.answer || '').trim().toLowerCase();
-      const isCorrect = userAns === table.duelState.secretAnswer;
-      resolveDuelRound(table, isCorrect, isCorrect ? `${player.name} answered correctly!` : `${player.name} got it wrong!`);
+      const userAns = (data.answer || '').trim();
+      const cleanUserAns = userAns.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const cleanSecret = (table.duelState.secretAnswer || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      
+      const isCorrect = cleanUserAns === cleanSecret;
+      resolveDuelRound(table, isCorrect, userAns);
       break;
     }
 
@@ -386,7 +435,8 @@ function startDuel(table, p1, p2) {
   }
 }
 
-function resolveDuelRound(table, opponentGotCorrect, reason) {
+// Shows the submitted response, reveals the secret answer, and transfers coins
+function resolveDuelRound(table, opponentGotCorrect, submittedAnswer) {
   if (!table || !table.duelState) return;
 
   const askerSeatIdx = table.seats.findIndex(s => s && s.id === table.duelState.askerId);
@@ -411,51 +461,74 @@ function resolveDuelRound(table, opponentGotCorrect, reason) {
     winner.coins += stolen;
   }
 
+  // Handle Tutorial Completion
   if (table.duelState.isTutorial) {
     const humanPlayer = players.get(asker.id);
     if (humanPlayer) {
       humanPlayer.coins += 100;
       humanPlayer.firstGameDone = true;
       asker.coins = humanPlayer.coins;
-      sendToPlayer(humanPlayer.id, {
-        type: 'FIRST_WIN_COMPLETED',
-        bonus: 100,
-        message: '🎉 Guaranteed first win! +100 bonus coins awarded!'
-      });
     }
+
+    const tutorialPayload = {
+      type: 'ROUND_RESULT',
+      question: table.duelState.secretQuestion,
+      submittedAnswer: submittedAnswer,
+      secretAnswer: table.duelState.secretAnswer,
+      askerName: asker.name,
+      answererName: answerer.name,
+      isCorrect: false,
+      winnerName: asker.name,
+      loserName: answerer.name,
+      stolen: 100,
+      isTutorial: true,
+      message: '🎉 Guaranteed first win! +100 bonus coins awarded!'
+    };
+
+    sendToPlayer(asker.id, tutorialPayload);
     table.seats[1] = null;
     table.duelState = null;
     broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
     return;
   }
 
+  // Send complete response details so players can inspect the answer
   const resultPayload = {
     type: 'ROUND_RESULT',
+    question: table.duelState.secretQuestion,
+    submittedAnswer: submittedAnswer,
+    secretAnswer: table.duelState.secretAnswer,
+    askerName: asker.name,
+    answererName: answerer.name,
+    isCorrect: opponentGotCorrect,
     winnerName: winner.name,
     loserName: loser.name,
-    stolen: stolen,
-    reason: reason
+    stolen: stolen
   };
 
   if (!asker.isBot) sendToPlayer(asker.id, resultPayload);
   if (!answerer.isBot) sendToPlayer(answerer.id, resultPayload);
 
+  // If someone ran out of coins
   if (loser.coins <= 0) {
-    const gameOverPayload = {
-      type: 'MATCH_OVER',
-      winnerName: winner.name,
-      loserName: loser.name,
-      message: `${loser.name} lost all their coins!`
-    };
-    if (!asker.isBot) sendToPlayer(asker.id, gameOverPayload);
-    if (!answerer.isBot) sendToPlayer(answerer.id, gameOverPayload);
+    setTimeout(() => {
+      const gameOverPayload = {
+        type: 'MATCH_OVER',
+        winnerName: winner.name,
+        loserName: loser.name,
+        message: `${loser.name} lost all their coins!`
+      };
+      if (!asker.isBot) sendToPlayer(asker.id, gameOverPayload);
+      if (!answerer.isBot) sendToPlayer(answerer.id, gameOverPayload);
 
-    table.seats = [null, null];
-    table.duelState = null;
-    broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
+      table.seats = [null, null];
+      table.duelState = null;
+      broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
+    }, 4000);
     return;
   }
 
+  // Swap turns after a 4-second delay so players can read the response
   table.duelState.askerId = answerer.id;
   table.duelState.secretQuestion = null;
   table.duelState.secretAnswer = null;
@@ -468,10 +541,9 @@ function resolveDuelRound(table, opponentGotCorrect, reason) {
     } else {
       botAskQuestion(table, asker);
     }
-  }, 1800);
+  }, 4200);
 }
 
-// Selects random question from questions.json
 function botAskQuestion(table, humanPlayer) {
   const chosen = botQuestions[Math.floor(Math.random() * botQuestions.length)];
   table.duelState.secretQuestion = chosen.q;
