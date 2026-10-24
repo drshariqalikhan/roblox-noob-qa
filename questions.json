@@ -1,62 +1,242 @@
 [
   {
-    "q": "What color is a Roblox noob's torso?",
-    "a": "blue"
+    "q": "What is the place value of the digit 9 in the number 941?",
+    "a": "hundreds"
   },
   {
-    "q": "What color is a Roblox noob's head?",
-    "a": "yellow"
+    "q": "What is 600 + 40 + 7 in standard form?",
+    "a": "647"
   },
   {
-    "q": "What color are a Roblox noob's legs?",
-    "a": "green"
+    "q": "Complete the number pattern: 135, 145, 155, ___, 175.",
+    "a": "165"
   },
   {
-    "q": "What sound does a Roblox character make when resetting?",
-    "a": "oof"
+    "q": "What is 583 + 49?",
+    "a": "632"
   },
   {
-    "q": "What is the virtual currency of Roblox?",
-    "a": "robux"
+    "q": "What is 800 - 364?",
+    "a": "436"
   },
   {
-    "q": "What is 15 + 15?",
-    "a": "30"
+    "q": "What is 4 x 3?",
+    "a": "12"
   },
   {
-    "q": "What is 10 x 3?",
-    "a": "30"
-  },
-  {
-    "q": "What is 50 - 20?",
-    "a": "30"
-  },
-  {
-    "q": "How many legs does a spider have?",
+    "q": "What is 32 divided by 4?",
     "a": "8"
   },
   {
-    "q": "How many days are in a week?",
-    "a": "7"
+    "q": "If 5 children share 25 sweets equally, how many sweets does each child get?",
+    "a": "5"
   },
   {
-    "q": "How many hours are in a day?",
-    "a": "24"
+    "q": "How many cents are there in $4.50?",
+    "a": "450"
   },
   {
-    "q": "What color do you get by mixing yellow and blue?",
-    "a": "green"
+    "q": "What is the total value of four 50-cent coins?",
+    "a": "$2.00"
   },
   {
-    "q": "What is the opposite of hot?",
-    "a": "cold"
+    "q": "How many minutes past the hour is shown when the minute hand points at 8?",
+    "a": "40"
   },
   {
-    "q": "What is 100 divided by 2?",
-    "a": "50"
+    "q": "What time is 30 minutes after 10:30 a.m.?",
+    "a": "11:00 a.m."
   },
   {
-    "q": "What shape has 3 sides?",
-    "a": "triangle"
+    "q": "Which unit of measurement should you use to measure the length of a classroom: centimeters or meters?",
+    "a": "meters"
+  },
+  {
+    "q": "Convert 3 kilograms into grams.",
+    "a": "3000"
+  },
+  {
+    "q": "If a jug holds 2 liters of water, how many 1-liter bottles can it fill completely?",
+    "a": "2"
+  },
+  {
+    "q": "What fraction of a shape is unshaded if 2 out of 5 equal parts are shaded?",
+    "a": "3/5"
+  },
+  {
+    "q": "Which fraction is smaller: 1/3 or 1/6?",
+    "a": "1/6"
+  },
+  {
+    "q": "How many flat faces does a cylinder have?",
+    "a": "2"
+  },
+  {
+    "q": "What 2D shape has 0 straight sides and 0 corners?",
+    "a": "circle"
+  },
+  {
+    "q": "In a picture graph, if 1 star symbol stands for 4 books, how many books do 3 stars stand for?",
+    "a": "12"
+  },
+  {
+    "q": "What is the past tense of the verb 'eat'?",
+    "a": "ate"
+  },
+  {
+    "q": "What is the plural form of the word 'child'?",
+    "a": "children"
+  },
+  {
+    "q": "What punctuation mark must you use at the end of a question?",
+    "a": "question mark"
+  },
+  {
+    "q": "Fill in the blank with a, an, or the: 'We saw ___ huge elephant at the Singapore Zoo.'",
+    "a": "a"
+  },
+  {
+    "q": "What is the opposite of the word 'brave'?",
+    "a": "cowardly"
+  },
+  {
+    "q": "Fill in the blank: 'The books belong to my sisters. They are ___ books.'",
+    "a": "their"
+  },
+  {
+    "q": "Identify the proper noun in this sentence: 'David plays soccer every Saturday.'",
+    "a": "David"
+  },
+  {
+    "q": "Choose the correct word: 'Neither of the boys (is / are) going to the library today.'",
+    "a": "is"
+  },
+  {
+    "q": "What do you call a collective group of birds flying together?",
+    "a": "flock"
+  },
+  {
+    "q": "What is the adjective in the sentence: 'The clever student solved the puzzle quickly.'",
+    "a": "clever"
+  },
+  {
+    "q": "Change the word 'happy' into an adverb.",
+    "a": "happily"
+  },
+  {
+    "q": "What is the contraction for 'do not'?",
+    "a": "don't"
+  },
+  {
+    "q": "Fill in the blank with a conjunction: 'I wanted to swim, ___ it started to rain heavily.'",
+    "a": "but"
+  },
+  {
+    "q": "What is the gender-opposite noun for 'actor'?",
+    "a": "actress"
+  },
+  {
+    "q": "Which word is spelled correctly: 'beautiful', 'beautifull', or 'beautifu'?",
+    "a": "beautiful"
+  },
+  {
+    "q": "Fill in the blank with the correct preposition: 'The cat jumped ___ the low fence.'",
+    "a": "over"
+  },
+  {
+    "q": "What is the pronoun in this sentence: 'They went to East Coast Park last weekend.'",
+    "a": "They"
+  },
+  {
+    "q": "What is a word that means the same as 'large'?",
+    "a": "big"
+  },
+  {
+    "q": "Fill in the blank: 'The water in the pot is boiling, so it is very ___.'",
+    "a": "hot"
+  },
+  {
+    "q": "What punctuation mark is used to show that someone is speaking directly?",
+    "a": "quotation marks"
+  },
+  {
+    "q": "What is the name of Singapore's national anthem?",
+    "a": "Majulah Singapura"
+  },
+  {
+    "q": "What color is the crescent moon on the Singapore national flag?",
+    "a": "white"
+  },
+  {
+    "q": "How many stars are on the Singapore national flag?",
+    "a": "5"
+  },
+  {
+    "q": "What core values do the five stars on our national flag represent? Name one.",
+    "a": "democracy"
+  },
+  {
+    "q": "What should you say immediately if you accidentally bump into a classmate in the corridor?",
+    "a": "I am sorry"
+  },
+  {
+    "q": "When someone gives you a gift or helps you, what phrase should you say to them?",
+    "a": "Thank you"
+  },
+  {
+    "q": "True or False: It is responsible behavior to leave your tray on the table after eating at a school canteen.",
+    "a": "False"
+  },
+  {
+    "q": "What should you do before entering a staff room or another classroom?",
+    "a": "knock on the door"
+  },
+  {
+    "q": "If you find a wallet on the school field, where should you hand it in?",
+    "a": "General Office"
+  },
+  {
+    "q": "What are you showing when you wait patiently for your turn to buy food at the stall?",
+    "a": "patience"
+  },
+  {
+    "q": "True or False: If you break a school rule, you should be honest and admit your mistake.",
+    "a": "True"
+  },
+  {
+    "q": "How can you help save electricity at home when leaving a room?",
+    "a": "turn off the lights"
+  },
+  {
+    "q": "What value are you practicing when you complete your homework on time without being reminded?",
+    "a": "responsibility"
+  },
+  {
+    "q": "What should you do if you see a classmate sitting all alone and crying during recess?",
+    "a": "comfort them"
+  },
+  {
+    "q": "True or False: It is alright to spread rumors or make fun of a friend online or on a tablet.",
+    "a": "False"
+  },
+  {
+    "q": "What National Day song features the famous line 'This is home truly, where I know I must be'?",
+    "a": "Home"
+  },
+  {
+    "q": "Which Total Defence pillar involves keeping our neighborhoods clean and staying healthy together?",
+    "a": "Social Defence"
+  },
+  {
+    "q": "What animal symbolizes the strength and courage of Singapore?",
+    "a": "lion"
+  },
+  {
+    "q": "What do we celebrate in school on 21st July to remember the importance of living harmoniously?",
+    "a": "Racial Harmony Day"
+  },
+  {
+    "q": "What is the proper way to listen when your teacher or a classmate is speaking to the class?",
+    "a": "attentively"
   }
 ]
