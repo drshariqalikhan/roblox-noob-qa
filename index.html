@@ -3,17 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Roblox Noob Q&amp;A Arena (Diagnostic Edition)</title>
+  <title>Roblox Noob Q&amp;A Arena</title>
   <meta name="theme-color" content="#101216">
 
-  <!-- Phaser 3 Framework -->
+  <!-- Pre-initialize logging so zero logs are ever lost -->
+  <script>
+    window.DB_LOGS = [];
+    window.logDB = function(level, msg) {
+      window.DB_LOGS.push({ time: new Date().toLocaleTimeString(), level: level, message: msg });
+      console.log(`[${level}] ${msg}`);
+    };
+  </script>
+
+  <!-- 1. Phaser 3 Framework -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <!-- Supabase Library -->
+  <!-- 2. Supabase Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Environment Config Script -->
-  <script src="/config.js"></script>
-  <!-- Database & Diagnostics Manager -->
-  <script src="supabase.js"></script>
+  <!-- 3. Dynamic Environment Config from server.js -->
+  <script src="/config.js" onerror="window.logDB('WARN', '/config.js could not be loaded; using default credentials.')"></script>
+  <!-- 4. Database & Diagnostics File -->
+  <script src="supabase.js" onerror="window.logDB('ERROR', 'Failed to load supabase.js! Verify the file is in the project root.')"></script>
 
   <style>
     :root {
@@ -38,13 +47,13 @@
     .badge { display: flex; align-items: center; gap: 6px; background: #242933; padding: 6px 12px; border-radius: 20px; border: 1px solid var(--card-border); font-size: 0.85rem; font-weight: 600; cursor: default; }
     .coin-badge { color: var(--accent); border-color: rgba(255, 204, 0, 0.3); }
 
-    /* DB Health Badge in Header */
+    /* Live DB Status Pill */
     #db-status-badge { cursor: pointer; transition: all 0.2s; }
-    #db-status-badge:hover { filter: brightness(1.2); }
-    .db-ok { border-color: rgba(46, 213, 115, 0.4); color: var(--success); }
-    .db-warn { border-color: rgba(255, 204, 0, 0.4); color: var(--accent); }
-    .db-err { border-color: rgba(255, 71, 87, 0.4); color: var(--danger); animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+    #db-status-badge:hover { filter: brightness(1.25); }
+    .db-ok { border-color: rgba(46, 213, 115, 0.5); color: var(--success); }
+    .db-warn { border-color: rgba(255, 204, 0, 0.5); color: var(--accent); }
+    .db-err { border-color: rgba(255, 71, 87, 0.5); color: var(--danger); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
     .btn { background: #2b313e; color: var(--text-main); border: 1px solid var(--card-border); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
     .btn:hover { background: #384050; }
@@ -67,12 +76,12 @@
     .timer-progress { height: 100%; background: var(--accent); width: 100%; transition: width 1s linear; }
 
     .overlay-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 30; justify-content: center; align-items: center; padding: 15px; }
-    .modal-content { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; width: 100%; max-width: 520px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
+    .modal-content { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; width: 100%; max-width: 540px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
     .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; }
     .modal-body { padding: 20px; overflow-y: auto; font-size: 0.9rem; line-height: 1.5; }
 
-    /* Diagnostic Console Styling */
-    #log-terminal { background: #0b0c10; border: 1px solid #1f232b; border-radius: 8px; padding: 12px; font-family: 'Courier New', Courier, monospace; font-size: 0.78rem; height: 260px; overflow-y: auto; color: #c5c6c7; display: flex; flex-direction: column; gap: 5px; user-select: text; }
+    /* Diagnostic Console Output */
+    #log-terminal { background: #0b0c10; border: 1px solid #1f232b; border-radius: 8px; padding: 12px; font-family: 'Courier New', Courier, monospace; font-size: 0.8rem; height: 260px; overflow-y: auto; color: #c5c6c7; display: flex; flex-direction: column; gap: 5px; user-select: text; }
     .log-row { word-break: break-all; }
     .log-INFO { color: #8ed1fc; }
     .log-SUCCESS { color: #2ed573; font-weight: bold; }
@@ -91,7 +100,6 @@
 </head>
 <body>
 
-  <!-- Top Dark Header HUD -->
   <header>
     <div class="brand">
       <div class="brand-icon">OOF</div>
@@ -102,7 +110,7 @@
     </div>
     
     <div class="stats-bar">
-      <!-- Live Database Status Badge -->
+      <!-- Live DB Health Badge -->
       <div id="db-status-badge" class="badge db-warn" onclick="openDiagnosticModal()" title="Click to view Database Diagnostics">
         <span id="db-status-icon">🟡</span>
         <span id="db-status-text">DB: Checking...</span>
@@ -119,7 +127,6 @@
     </div>
   </header>
 
-  <!-- Phaser Game Container -->
   <div id="game-container">
     <div id="lobby-controls">
       <span id="match-status-text">Click an empty chair at a table to sit</span>
@@ -159,7 +166,7 @@
 
   <!-- DIAGNOSTIC / DATABASE LOG MODAL -->
   <div id="diagnostic-modal" class="overlay-modal">
-    <div class="modal-content" style="max-width: 600px;">
+    <div class="modal-content">
       <div class="modal-header">
         <h2 style="color:var(--accent);">🛠️ Database Diagnostics &amp; Logs</h2>
         <button class="btn" onclick="closeDiagnosticModal()">✕</button>
@@ -170,15 +177,14 @@
           <button class="btn btn-accent" style="padding:4px 10px; font-size:0.75rem;" onclick="retestDatabaseConnection()">🔄 Re-test Connection</button>
         </div>
 
-        <!-- Terminal Output -->
         <div id="log-terminal"></div>
 
         <div style="margin-top:14px; padding:10px; background:#12141a; border-radius:6px; font-size:0.8rem; border-left:3px solid var(--accent);">
           <strong>Common Fixes:</strong>
           <ul style="padding-left:18px; margin-top:4px; color:#cbd5e1;">
             <li><strong>Code 42P01:</strong> Table <code>profiles</code> is missing. Run the SQL script in your Supabase SQL editor.</li>
-            <li><strong>Code 42501:</strong> RLS policy missing. Ensure you added policies for <code>anon</code> role.</li>
-            <li><strong>Missing Keys:</strong> Check your <code>.env</code> file in Codespaces or Render environment variables.</li>
+            <li><strong>Code 42501:</strong> RLS policy missing. Ensure policies exist for <code>anon</code> role.</li>
+            <li><strong>Adblockers:</strong> Brave Shields or uBlock Origin sometimes block <code>supabase.co</code> network requests.</li>
           </ul>
         </div>
       </div>
@@ -304,7 +310,7 @@
       { id: 3, seats: [null, null], waitSeconds: 60 }
     ];
 
-    // Real-Time Diagnostic Logger Listener
+    // Real-Time Log Listener
     window.onNewDBLog = (entry) => {
       renderLogToTerminal(entry);
     };
@@ -317,6 +323,17 @@
       row.innerText = `[${entry.time}] [${entry.level}] ${entry.message}`;
       terminal.appendChild(row);
       terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    function renderAllLogs() {
+      const terminal = document.getElementById('log-terminal');
+      if (!terminal) return;
+      terminal.innerHTML = '';
+      if (!window.DB_LOGS || window.DB_LOGS.length === 0) {
+        terminal.innerHTML = '<div style="color:var(--text-muted);">No logs recorded yet. Click "Re-test Connection".</div>';
+        return;
+      }
+      window.DB_LOGS.forEach(renderLogToTerminal);
     }
 
     function setDBStatusBadge(status, text) {
@@ -333,17 +350,23 @@
     }
 
     /* ==========================================================
-       2. STARTUP DIAGNOSTICS & RETRY
+       2. STARTUP HEALTH CHECK & DIAGNOSTICS
        ========================================================== */
     window.addEventListener('DOMContentLoaded', async () => {
-      // Re-render any logs that fired before DOM completed
-      window.DB_LOGS.forEach(renderLogToTerminal);
+      renderAllLogs();
       await runDatabaseStartupTest();
     });
 
     async function runDatabaseStartupTest() {
       setDBStatusBadge('warn', 'DB: Testing...');
-      const result = await DB.testConnection();
+
+      if (!window.DB || typeof window.DB.testConnection !== 'function') {
+        window.logDB('ERROR', 'window.DB is not defined! Check if supabase.js is loaded.');
+        setDBStatusBadge('err', 'DB: Error (Click to View)');
+        return;
+      }
+
+      const result = await window.DB.testConnection();
 
       if (result.ok) {
         setDBStatusBadge('ok', 'DB: Connected');
@@ -360,13 +383,17 @@
     }
 
     async function retestDatabaseConnection() {
-      const terminal = document.getElementById('log-terminal');
-      terminal.innerHTML = '<div style="color:var(--accent);">--- Retesting Database Connection ---</div>';
+      renderAllLogs();
       await runDatabaseStartupTest();
     }
 
-    function openDiagnosticModal() { document.getElementById('diagnostic-modal').style.display = 'flex'; }
-    function closeDiagnosticModal() { document.getElementById('diagnostic-modal').style.display = 'none'; }
+    function openDiagnosticModal() {
+      renderAllLogs();
+      document.getElementById('diagnostic-modal').style.display = 'flex';
+    }
+    function closeDiagnosticModal() {
+      document.getElementById('diagnostic-modal').style.display = 'none';
+    }
 
     // Audio Synthesizer
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -445,19 +472,24 @@
       btn.disabled = true;
 
       try {
-        const existing = await DB.getDeviceProfile();
+        if (!window.DB) throw new Error("Database helper (window.DB) is not available.");
+        const existing = await window.DB.getDeviceProfile();
         let profile;
         if (!existing) {
-          profile = await DB.registerDeviceProfile({ username, torsoColor, headColor, hat: 'hat_none' });
+          profile = await window.DB.registerDeviceProfile({ username, torsoColor, headColor, hat: 'hat_none' });
           showToast(`Character "${username}" registered!`);
         } else {
-          profile = await DB.updateAttributes({ username, torso_color: torsoColor, head_color: headColor });
+          profile = await window.DB.updateAttributes({ username, torso_color: torsoColor, head_color: headColor });
           showToast("Character updated!");
         }
-        applyProfile(profile);
+        applyProfile(profile || { username, torso_color: torsoColor, head_color: headColor, coins, hat: equipped.hat });
         document.getElementById('character-modal').style.display = 'none';
       } catch (err) {
-        alert("Database save failed: " + err.message + "\nCheck logs by clicking the red DB badge.");
+        // Fallback gracefully so player is not blocked
+        window.logDB('ERROR', `Character save error: ${err.message}`);
+        applyProfile({ username, torso_color: torsoColor, head_color: headColor, coins, hat: equipped.hat });
+        document.getElementById('character-modal').style.display = 'none';
+        showToast("⚠️ Saved locally! Check DB status badge for error logs.");
       } finally {
         btn.disabled = false;
       }
@@ -723,7 +755,7 @@
           firstGameDone = true;
           coins += data.bonus;
           updateHud();
-          DB.updateAttributes({ coins: coins, first_game_done: true });
+          if (window.DB) window.DB.updateAttributes({ coins: coins, first_game_done: true });
           playBeep('win');
           showToast(data.message);
           standUp();
@@ -753,7 +785,7 @@
             if (phaserScene) phaserScene.spawnCoinFloat(window.innerWidth / 2, window.innerHeight * 0.5, `-${data.stolen} COINS!`, '#ff4757');
           }
           updateHud();
-          DB.updateAttributes({ coins: coins });
+          if (window.DB) window.DB.updateAttributes({ coins: coins });
           break;
         case 'MATCH_OVER':
           showToast(data.message);
@@ -762,7 +794,7 @@
         case 'REPORT_SUCCESS':
           coins += data.bounty;
           updateHud();
-          DB.updateAttributes({ coins: coins });
+          if (window.DB) window.DB.updateAttributes({ coins: coins });
           playBeep('win');
           showToast(data.message);
           break;
@@ -923,7 +955,7 @@
       coins -= price;
       equipped.hat = id;
       updateHud();
-      await DB.updateAttributes({ coins: coins, hat: id });
+      if (window.DB) await window.DB.updateAttributes({ coins: coins, hat: id });
       if (isConnected && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'SYNC_PROFILE', coins, hat: id, firstGameDone, torsoColor: myTorsoColor, headColor: myHeadColor }));
       }
