@@ -1,209 +1,456 @@
-/**
- * supabase.js - Device Auth, DB Manager & Real-Time Connection Diagnostic Engine
- */
+require('dotenv').config();
+const http = require('http');
+const path = require('path');
+const express = require('express');
+const { WebSocketServer, WebSocket } = require('ws');
 
-window.DB_LOGS = [];
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
 
-function logDB(level, message, data = null) {
-  const entry = {
-    time: new Date().toLocaleTimeString(),
-    level, // 'INFO', 'SUCCESS', 'WARN', 'ERROR'
-    message,
-    data
+const PORT = process.env.PORT || 3000;
+const MAX_SERVER_PLAYERS = 13;
+const MAX_COIN_STEAL = 30;
+
+// Dynamic config route to supply public keys to frontend
+app.get('/config.js', (req, res) => {
+  res.type('application/javascript');
+  res.send(`
+    window.ENV = {
+      SUPABASE_URL: "${process.env.SUPABASE_URL || ''}",
+      SUPABASE_ANON_KEY: "${process.env.SUPABASE_ANON_KEY || ''}"
+    };
+  `);
+});
+
+// Serve static frontend files
+app.use(express.static(__dirname));
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Tables setup: 3 tables * 2 chairs = 6 players playing max (Rule 1)
+const tables = [
+  { id: 1, seats: [null, null], duelState: null, waitTimer: null, waitSeconds: 60 },
+  { id: 2, seats: [null, null], duelState: null, waitTimer: null, waitSeconds: 60 },
+  { id: 3, seats: [null, null], duelState: null, waitTimer: null, waitSeconds: 60 }
+];
+
+const players = new Map();
+
+function broadcast(payload) {
+  const msg = JSON.stringify(payload);
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(msg);
+    }
+  });
+}
+
+function getSanitizedTables() {
+  return tables.map(t => ({
+    id: t.id,
+    seats: t.seats.map(s => s ? {
+      id: s.id,
+      name: s.name,
+      coins: s.coins,
+      hat: s.hat,
+      isBot: s.isBot || false
+    } : null),
+    waitSeconds: t.waitSeconds,
+    hasActiveDuel: !!t.duelState
+  }));
+}
+
+function sendToPlayer(playerId, payload) {
+  const p = players.get(playerId);
+  if (p && p.ws.readyState === WebSocket.OPEN) {
+    p.ws.send(JSON.stringify(payload));
+  }
+}
+
+wss.on('connection', (ws) => {
+  if (players.size >= MAX_SERVER_PLAYERS) {
+    ws.send(JSON.stringify({ type: 'SERVER_FULL', message: 'Server is full (13/13 max players).' }));
+    ws.close();
+    return;
+  }
+
+  const playerId = 'user_' + Math.random().toString(36).substring(2, 9);
+  const defaultName = 'Noob_' + playerId.substring(5);
+
+  const playerData = {
+    ws,
+    id: playerId,
+    name: defaultName,
+    coins: 0,
+    hat: 'hat_none',
+    tableId: null,
+    seatIdx: null,
+    firstGameDone: false
   };
-  window.DB_LOGS.push(entry);
-  console.log(`[DB ${level}] ${message}`, data || '');
+  players.set(playerId, playerData);
 
-  // Dispatch event so the UI log window updates in real time
-  if (typeof window.onNewDBLog === 'function') {
-    window.onNewDBLog(entry);
-  }
-}
+  ws.send(JSON.stringify({
+    type: 'INIT_STATE',
+    playerId: playerId,
+    name: defaultName,
+    tables: getSanitizedTables(),
+    serverPlayerCount: players.size,
+    maxPlayers: MAX_SERVER_PLAYERS
+  }));
 
-// 1. Load Credentials from window.ENV (injected by /config.js)
-const SUPABASE_URL = (window.ENV && window.ENV.SUPABASE_URL) ? window.ENV.SUPABASE_URL.trim() : "";
-const SUPABASE_ANON_KEY = (window.ENV && window.ENV.SUPABASE_ANON_KEY) ? window.ENV.SUPABASE_ANON_KEY.trim() : "";
+  broadcast({
+    type: 'SERVER_INFO',
+    count: players.size,
+    tables: getSanitizedTables()
+  });
 
-let supabase = null;
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  logDB('WARN', 'Supabase credentials missing in window.ENV. Check .env file and /config.js route.');
-} else {
-  try {
-    if (window.supabase && typeof window.supabase.createClient === 'function') {
-      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      logDB('INFO', `Supabase client initialized with URL: ${SUPABASE_URL}`);
-    } else {
-      logDB('ERROR', 'Supabase JS library (@supabase/supabase-js) is not loaded on the page.');
-    }
-  } catch (err) {
-    logDB('ERROR', `Failed to initialize Supabase client: ${err.message}`, err);
-  }
-}
-
-const DB = {
-  getDeviceId() {
-    let devId = localStorage.getItem('roblox_noob_device_uid');
-    if (!devId) {
-      devId = (window.crypto && crypto.randomUUID) 
-        ? crypto.randomUUID() 
-        : 'dev_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-      localStorage.setItem('roblox_noob_device_uid', devId);
-      logDB('INFO', `Generated new Device ID: ${devId}`);
-    }
-    return devId;
-  },
-
-  /**
-   * Diagnostic Health Check: Runs on startup and tests every layer of your database setup
-   */
-  async testConnection() {
-    logDB('INFO', '=== Starting Supabase Diagnostics ===');
-
-    // Test 1: Check Environment Variables
-    if (!SUPABASE_URL) {
-      logDB('ERROR', 'SUPABASE_URL is empty! Ensure .env contains SUPABASE_URL and server.js is running.');
-      return { ok: false, error: 'Missing SUPABASE_URL' };
-    }
-    if (!SUPABASE_ANON_KEY) {
-      logDB('ERROR', 'SUPABASE_ANON_KEY is empty! Ensure .env contains SUPABASE_ANON_KEY.');
-      return { ok: false, error: 'Missing SUPABASE_ANON_KEY' };
-    }
-    logDB('SUCCESS', `Keys found. URL: ${SUPABASE_URL}`);
-
-    // Test 2: Check Client
-    if (!supabase) {
-      logDB('ERROR', 'Supabase client failed to initialize.');
-      return { ok: false, error: 'Client not initialized' };
-    }
-
-    // Test 3: Ping database & query 'profiles' table
+  ws.on('message', (raw) => {
     try {
-      logDB('INFO', 'Pinging table "profiles"...');
-      const { data, error, status, statusText } = await supabase
-        .from('profiles')
-        .select('device_id')
-        .limit(1);
-
-      if (error) {
-        // Detailed Troubleshooting Guidance
-        if (error.code === '42P01') {
-          logDB('ERROR', 'FATAL: Table "profiles" does NOT exist in your Supabase database!', error);
-          logDB('WARN', 'Fix: Go to Supabase Dashboard -> SQL Editor and run the CREATE TABLE script.');
-        } else if (error.code === '42501') {
-          logDB('ERROR', 'RLS PERMISSION DENIED: Row Level Security is blocking the "anon" role!', error);
-          logDB('WARN', 'Fix: In Supabase SQL Editor, run: CREATE POLICY "Allow read" ON public.profiles FOR SELECT TO anon USING (true);');
-        } else {
-          logDB('ERROR', `Query error [Code: ${error.code || 'N/A'} - HTTP ${status}]: ${error.message}`, error);
-        }
-        return { ok: false, error: error.message, details: error };
-      }
-
-      logDB('SUCCESS', `Connection verified! Table "profiles" is accessible (HTTP ${status}).`);
-
-      // Test 4: Device specific lookup
-      const deviceId = this.getDeviceId();
-      logDB('INFO', `Querying profile for current device: ${deviceId}`);
-      const { data: profile, error: pError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('device_id', deviceId)
-        .maybeSingle();
-
-      if (pError) {
-        logDB('ERROR', `Error fetching device profile: ${pError.message}`, pError);
-        return { ok: false, error: pError.message };
-      }
-
-      if (profile) {
-        logDB('SUCCESS', `Device recognized! Registered as: "${profile.username}" (${profile.coins} coins)`);
-      } else {
-        logDB('INFO', 'New device detected. No existing profile found yet (will prompt customizer).');
-      }
-
-      logDB('SUCCESS', '=== All Database Checks Passed ===');
-      return { ok: true, profile };
-    } catch (netErr) {
-      logDB('ERROR', `Network / CORS error reaching Supabase: ${netErr.message}`, netErr);
-      logDB('WARN', 'Troubleshoot: Verify your internet connection or check if an adblocker is blocking *.supabase.co.');
-      return { ok: false, error: netErr.message };
+      const data = JSON.parse(raw);
+      handleMessage(playerData, data);
+    } catch (err) {
+      console.error('Error handling message:', err);
     }
-  },
+  });
 
-  async getDeviceProfile() {
-    if (!supabase) return null;
-    const deviceId = this.getDeviceId();
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('device_id', deviceId)
-      .maybeSingle();
+  ws.on('close', () => {
+    handlePlayerLeave(playerData);
+    players.delete(playerId);
+    broadcast({
+      type: 'SERVER_INFO',
+      count: players.size,
+      tables: getSanitizedTables()
+    });
+  });
+});
 
-    if (error) {
-      logDB('ERROR', `getDeviceProfile failed: ${error.message}`, error);
-      return null;
-    }
-    return data;
-  },
-
-  async registerDeviceProfile(characterData) {
-    if (!supabase) throw new Error("Supabase is not initialized.");
-    const deviceId = this.getDeviceId();
-    logDB('INFO', `Registering new device in DB: ${characterData.username}`);
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .insert([
-        {
-          device_id: deviceId,
-          username: characterData.username,
-          torso_color: characterData.torsoColor || '#0055bf',
-          head_color: characterData.headColor || '#ffe800',
-          hat: characterData.hat || 'hat_none',
-          coins: 0,
-          first_game_done: false
-        }
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      logDB('ERROR', `Registration failed [${error.code}]: ${error.message}`, error);
-      if (error.code === '42501') {
-        logDB('WARN', 'Fix: Allow INSERT in RLS: CREATE POLICY "Allow insert" ON public.profiles FOR INSERT TO anon WITH CHECK (true);');
+function handlePlayerLeave(player) {
+  if (player.tableId !== null && player.seatIdx !== null) {
+    const table = tables.find(t => t.id === player.tableId);
+    if (table) {
+      table.seats[player.seatIdx] = null;
+      if (table.waitTimer) {
+        clearInterval(table.waitTimer);
+        table.waitTimer = null;
+        table.waitSeconds = 60;
       }
-      throw error;
-    }
+      
+      const oppIdx = player.seatIdx === 0 ? 1 : 0;
+      const opponent = table.seats[oppIdx];
 
-    logDB('SUCCESS', `Character "${characterData.username}" saved to database!`, data);
-    return data;
-  },
-
-  async updateAttributes(updates) {
-    if (!supabase) return null;
-    const deviceId = this.getDeviceId();
-    logDB('INFO', `Saving updates to DB for device ${deviceId}`, updates);
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
-      .eq('device_id', deviceId)
-      .select()
-      .single();
-
-    if (error) {
-      logDB('ERROR', `updateAttributes failed [${error.code}]: ${error.message}`, error);
-      if (error.code === '42501') {
-        logDB('WARN', 'Fix: Allow UPDATE in RLS: CREATE POLICY "Allow update" ON public.profiles FOR UPDATE TO anon USING (true);');
+      if (opponent && !opponent.isBot) {
+        sendToPlayer(opponent.id, {
+          type: 'OPPONENT_LEFT',
+          message: `${player.name} left the table.`
+        });
+      } else if (opponent && opponent.isBot) {
+        table.seats[oppIdx] = null;
       }
-    } else {
-      logDB('SUCCESS', 'Attributes synced with Supabase successfully.');
+
+      table.duelState = null;
+      player.tableId = null;
+      player.seatIdx = null;
+      broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
     }
-    return data;
   }
-};
+}
 
-window.DB = DB;
+function handleMessage(player, data) {
+  switch (data.type) {
+    case 'SYNC_PROFILE': {
+      player.coins = parseInt(data.coins) || 0;
+      player.hat = data.hat || 'hat_none';
+      player.firstGameDone = !!data.firstGameDone;
+      break;
+    }
+
+    case 'SIT_AT_TABLE': {
+      const table = tables.find(t => t.id === data.tableId);
+      if (!table) return;
+
+      const seatIdx = data.seatIdx;
+      if (table.seats[seatIdx] !== null || player.tableId !== null) {
+        player.ws.send(JSON.stringify({ type: 'ACTION_FAILED', message: 'Chair is occupied or you are already seated.' }));
+        return;
+      }
+
+      player.tableId = table.id;
+      player.seatIdx = seatIdx;
+      table.seats[seatIdx] = {
+        id: player.id,
+        name: player.name,
+        coins: player.coins,
+        hat: player.hat,
+        isBot: false
+      };
+
+      if (!player.firstGameDone) {
+        const otherIdx = seatIdx === 0 ? 1 : 0;
+        const tutorialBot = {
+          id: 'bot_tutorial',
+          name: 'Computer (Easy)',
+          coins: 40,
+          hat: 'hat_none',
+          isBot: true
+        };
+        table.seats[otherIdx] = tutorialBot;
+        table.duelState = {
+          askerId: player.id,
+          secretQuestion: null,
+          secretAnswer: null,
+          isTutorial: true
+        };
+        broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
+        sendToPlayer(player.id, {
+          type: 'START_TUTORIAL_MATCH',
+          message: 'Welcome! First game is vs Computer with guaranteed win for 100 coins!'
+        });
+        return;
+      }
+
+      const oppIdx = seatIdx === 0 ? 1 : 0;
+      const existingOpp = table.seats[oppIdx];
+
+      if (existingOpp) {
+        if (table.waitTimer) {
+          clearInterval(table.waitTimer);
+          table.waitTimer = null;
+          table.waitSeconds = 60;
+        }
+        startDuel(table, table.seats[0], table.seats[1]);
+      } else {
+        table.waitSeconds = 60;
+        broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
+
+        if (table.waitTimer) clearInterval(table.waitTimer);
+        table.waitTimer = setInterval(() => {
+          table.waitSeconds--;
+          if (table.waitSeconds > 0) {
+            broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
+          } else {
+            clearInterval(table.waitTimer);
+            table.waitTimer = null;
+            spawnComputerOpponent(table, player);
+          }
+        }, 1000);
+      }
+
+      broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
+      break;
+    }
+
+    case 'FORCE_COMPUTER_OPPONENT': {
+      const table = tables.find(t => t.id === player.tableId);
+      if (!table) return;
+      if (table.waitTimer) {
+        clearInterval(table.waitTimer);
+        table.waitTimer = null;
+      }
+      spawnComputerOpponent(table, player);
+      break;
+    }
+
+    case 'STAND_UP': {
+      handlePlayerLeave(player);
+      break;
+    }
+
+    case 'SUBMIT_QUESTION': {
+      const table = tables.find(t => t.id === player.tableId);
+      if (!table || !table.duelState) return;
+
+      const { question, answer } = data;
+      if (!question || !answer) return;
+
+      table.duelState.secretQuestion = question.trim();
+      table.duelState.secretAnswer = answer.trim().toLowerCase();
+
+      const oppIdx = player.seatIdx === 0 ? 1 : 0;
+      const opponent = table.seats[oppIdx];
+
+      if (opponent.isBot) {
+        if (table.duelState.isTutorial) {
+          setTimeout(() => {
+            resolveDuelRound(table, false, "Computer guessed: 'uhh... 42?'");
+          }, 1200);
+        } else {
+          const aiCorrect = Math.random() < 0.35;
+          setTimeout(() => {
+            resolveDuelRound(table, aiCorrect, aiCorrect ? "Computer guessed correctly!" : "Computer guessed wrong!");
+          }, 1500);
+        }
+      } else {
+        sendToPlayer(opponent.id, {
+          type: 'PROMPT_ANSWER',
+          question: question,
+          askerName: player.name
+        });
+      }
+      break;
+    }
+
+    case 'SUBMIT_ANSWER': {
+      const table = tables.find(t => t.id === player.tableId);
+      if (!table || !table.duelState) return;
+
+      const userAns = (data.answer || '').trim().toLowerCase();
+      const isCorrect = userAns === table.duelState.secretAnswer;
+      resolveDuelRound(table, isCorrect, isCorrect ? `${player.name} answered correctly!` : `${player.name} got it wrong!`);
+      break;
+    }
+
+    case 'REPORT_VIOLATOR': {
+      const targetName = (data.targetName || '').trim();
+      player.coins += 10;
+      sendToPlayer(player.id, {
+        type: 'REPORT_SUCCESS',
+        bounty: 10,
+        message: `Report filed for "${targetName}". Violator banned! Handwritten Rule 5 reward: +10 Coins!`
+      });
+      broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
+      break;
+    }
+  }
+}
+
+function spawnComputerOpponent(table, player) {
+  const oppIdx = player.seatIdx === 0 ? 1 : 0;
+  if (table.seats[oppIdx] !== null) return;
+
+  const computerPlayer = {
+    id: 'bot_' + Math.random().toString(36).substring(2, 6),
+    name: 'Roblox_AI_Bot',
+    coins: 60,
+    hat: 'hat_cap',
+    isBot: true
+  };
+  table.seats[oppIdx] = computerPlayer;
+  startDuel(table, table.seats[player.seatIdx], computerPlayer);
+}
+
+function startDuel(table, p1, p2) {
+  table.duelState = {
+    askerId: p1.id,
+    secretQuestion: null,
+    secretAnswer: null,
+    isTutorial: false
+  };
+
+  broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
+
+  if (!p1.isBot) {
+    sendToPlayer(p1.id, { type: 'PROMPT_ASK', opponentName: p2.name });
+  }
+  if (!p2.isBot) {
+    sendToPlayer(p2.id, { type: 'WAITING_FOR_QUESTION', opponentName: p1.name });
+  }
+}
+
+function resolveDuelRound(table, opponentGotCorrect, reason) {
+  if (!table || !table.duelState) return;
+
+  const askerSeatIdx = table.seats.findIndex(s => s && s.id === table.duelState.askerId);
+  const answererSeatIdx = askerSeatIdx === 0 ? 1 : 0;
+
+  const asker = table.seats[askerSeatIdx];
+  const answerer = table.seats[answererSeatIdx];
+
+  let winner, loser, stolen;
+
+  if (opponentGotCorrect) {
+    winner = answerer;
+    loser = asker;
+    stolen = Math.min(loser.coins, MAX_COIN_STEAL);
+    loser.coins -= stolen;
+    winner.coins += stolen;
+  } else {
+    winner = asker;
+    loser = answerer;
+    stolen = Math.min(loser.coins, MAX_COIN_STEAL);
+    loser.coins -= stolen;
+    winner.coins += stolen;
+  }
+
+  if (table.duelState.isTutorial) {
+    const humanPlayer = players.get(asker.id);
+    if (humanPlayer) {
+      humanPlayer.coins += 100;
+      humanPlayer.firstGameDone = true;
+      asker.coins = humanPlayer.coins;
+      sendToPlayer(humanPlayer.id, {
+        type: 'FIRST_WIN_COMPLETED',
+        bonus: 100,
+        message: '🎉 Guaranteed first win! +100 bonus coins awarded!'
+      });
+    }
+    table.seats[1] = null;
+    table.duelState = null;
+    broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
+    return;
+  }
+
+  const resultPayload = {
+    type: 'ROUND_RESULT',
+    winnerName: winner.name,
+    loserName: loser.name,
+    stolen: stolen,
+    reason: reason
+  };
+
+  if (!asker.isBot) sendToPlayer(asker.id, resultPayload);
+  if (!answerer.isBot) sendToPlayer(answerer.id, resultPayload);
+
+  if (loser.coins <= 0) {
+    const gameOverPayload = {
+      type: 'MATCH_OVER',
+      winnerName: winner.name,
+      loserName: loser.name,
+      message: `${loser.name} lost all their coins!`
+    };
+    if (!asker.isBot) sendToPlayer(asker.id, gameOverPayload);
+    if (!answerer.isBot) sendToPlayer(answerer.id, gameOverPayload);
+
+    table.seats = [null, null];
+    table.duelState = null;
+    broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
+    return;
+  }
+
+  table.duelState.askerId = answerer.id;
+  table.duelState.secretQuestion = null;
+  table.duelState.secretAnswer = null;
+
+  broadcast({ type: 'TABLE_UPDATE', tables: getSanitizedTables() });
+
+  setTimeout(() => {
+    if (!answerer.isBot) {
+      sendToPlayer(answerer.id, { type: 'PROMPT_ASK', opponentName: asker.name });
+    } else {
+      botAskQuestion(table, asker);
+    }
+  }, 1800);
+}
+
+function botAskQuestion(table, humanPlayer) {
+  const botQuestions = [
+    { q: "What color is a Roblox noob's torso?", a: "blue" },
+    { q: "What color is a Roblox noob's head?", a: "yellow" },
+    { q: "What is 15 + 15?", a: "30" },
+    { q: "How many legs does a spider have?", a: "8" }
+  ];
+  const chosen = botQuestions[Math.floor(Math.random() * botQuestions.length)];
+  table.duelState.secretQuestion = chosen.q;
+  table.duelState.secretAnswer = chosen.a;
+
+  sendToPlayer(humanPlayer.id, {
+    type: 'PROMPT_ANSWER',
+    question: chosen.q,
+    askerName: 'Roblox_AI_Bot'
+  });
+}
+
+server.listen(PORT, () => {
+  console.log(`Roblox Noob Q&A server listening on port ${PORT}`);
+});
